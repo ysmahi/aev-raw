@@ -8,7 +8,7 @@ USER root
 
 COPY ./ ./
 
-RUN npm install -g bower
+#RUN npm install -g bower
 
 # Force log dans stdout/err plutot que fichier
 #RUN ln -sf /dev/stdout /var/opt/rh/rh-nginx112/log/nginx/access.log \
@@ -17,12 +17,12 @@ RUN npm install -g bower
 
 #RUN mv ./nginx.conf $NGINX_CONF_PATH
 
-RUN chown -R 1001:0 $HOME && chmod -R g+rw $HOME && chmod -R 775 $HOME/.config
+#RUN chown -R 1001:0 $HOME && chmod -R g+rw $HOME && chmod -R 775 $HOME/.config
 
 STOPSIGNAL SIGTERM
 
 USER 1001
 
-RUN bower install 
+#RUN bower install 
 
 CMD $STI_SCRIPTS_PATH/run

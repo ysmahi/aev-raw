@@ -2,7 +2,7 @@
 
 node('SlaveOCPT') {
 
-  String configFile = 'openshift-config-nginx.yaml'   // YAML contient tous les parametres pour objets de l'application dans OpenShift
+  String configFile = 'openshift-config.yaml'   // YAML contient tous les parametres pour objets de l'application dans OpenShift
   
   try {
 
