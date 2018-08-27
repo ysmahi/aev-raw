@@ -25,10 +25,11 @@ node('SlaveOCPT') {
 
         stage("Build sans Maven") {
             wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'xterm']) {
+              myapp = 'nginx'
               sh(script: "rm -rf package")
-              sh(script: "mkdir -p package/nodejs")
-              sh(script: "cp -prv rawgraphs/* package/nodejs")
-              sh(script: "cp -prv nodejs/* package/nodejs")
+              sh(script: "mkdir -p package/${myapp}")
+              sh(script: "cp -prv rawgraphs/* package/${myapp}")
+              sh(script: "cp -prv nginx/* package/${myapp}")
             }
         }
 

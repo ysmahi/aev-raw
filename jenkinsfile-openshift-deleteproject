@@ -11,10 +11,8 @@ node('SlaveOCPT') {
           checkout scm
     }
 
-    //dir('repoScripts') { git url : 'http://bitbucket.agf.fr/scm/y6/y6-ocp-azf-scripts-groovy.git' }
-    //def commonOCP = load("repoScripts/jenkinsfile-openshift-common-init")  // script de fonctions OCP
-    def commonOCP = load("jenkinsfile-openshift-common-init") //ATTENTION LOCAL
-
+    dir('repoScripts') { git url : 'http://bitbucket.agf.fr/scm/y6/y6-ocp-azf-scripts-groovy.git' }
+    def commonOCP = load("repoScripts/jenkinsfile-openshift-common-init")  // script de fonctions OCP
 
     commonOCP.deleteFromConfig(configFile)
 
