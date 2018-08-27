@@ -17,7 +17,7 @@ RUN PATH=/opt/rh/rh-nodejs8/root/usr/bin:$PATH npm install -g bower
 
 #RUN mv ./nginx.conf $NGINX_CONF_PATH
 
-#RUN chown -R 1001:0 $HOME && chmod -R g+rw $HOME && chmod -R 775 $HOME/.config
+RUN chown -R 1001:0 $HOME && chmod -R g+rw $HOME && chmod -R 775 $HOME/.config
 
 STOPSIGNAL SIGTERM
 
