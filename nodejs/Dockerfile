@@ -8,7 +8,7 @@ USER root
 
 COPY ./ ./
 
-#RUN npm install -g bower
+RUN PATH=/opt/rh/rh-nodejs8/root/usr/bin:$PATH npm install -g bower
 
 # Force log dans stdout/err plutot que fichier
 #RUN ln -sf /dev/stdout /var/opt/rh/rh-nginx112/log/nginx/access.log \
@@ -23,6 +23,6 @@ STOPSIGNAL SIGTERM
 
 USER 1001
 
-#RUN bower install 
+RUN PATH=/opt/rh/rh-nodejs8/root/usr/bin:$PATH bower install 
 
 CMD $STI_SCRIPTS_PATH/run
