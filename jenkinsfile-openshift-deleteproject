@@ -16,7 +16,7 @@ node('SlaveOCPT') {
     def commonOCP = load("jenkinsfile-openshift-common-init") //ATTENTION LOCAL
 
 
-    commonOCP.deleteAppObjects(configFile)
+    commonOCP.deleteFromConfig(configFile)
 
     currentBuild.result = 'SUCCESS'
 
