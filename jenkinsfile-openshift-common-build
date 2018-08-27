@@ -1,0 +1,405 @@
+#!/usr/bin/env groovy
+
+// Constantes :
+
+configDir = "repoConf"       // sous-repertoire de $WORKSPACE contenant le repo -conf 
+packageDir = "package"       // sous-repertoire de $WORKSPACE contenant les artefacts pour buildApp (1 sous-repertoire par app)
+buildInputDir = "buildinput" // sous-repertoire de $WORKSPACE ou deposer les artefacts en entree du start-build
+
+freeTierQuota = "dev-quotas" // si cet objet quota est present alors on est en free tier avec tres peu de ressource
+
+
+// Variables globales, valorisees une fois par pipeline, declarer et laisser vide ici
+
+repoSource = ""     
+repoConf = ""
+artifactVersion = ""
+
+//---------------------------------------------------------------------------------------------------------------------------------
+// PRINTBANNER : affiche une banniere bien visible dans la log du job sous Jenkins
+//---------------------------------------------------------------------------------------------------------------------------------
+
+def printBanner(String message) {  // pour marquer stages pipeline
+    def line="==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--=="
+    def boldblue="\u001B[1m\u001B[34m"; def normal="\u001B[0m"; 
+    ansiColor('xterm') {
+      println "${boldblue}${line}${normal}\n${boldblue}${line}${normal}\n${boldblue}==--==--${normal}\n${boldblue}==--==--   ${message} ${normal}\n${boldblue}==--==--${normal}\n${boldblue}${line}${normal}\n${boldblue}${line}${normal}"
+    }
+}
+def printBanner2(String message) {  // pour BEGIN/END fonctions, en noir pas en bleu, et moins de lignes
+    def line="==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--=="
+    def bold="\u001B[1m"; def normal="\u001B[0m"; 
+    ansiColor('xterm') {
+      println "${bold}${line}${normal}\n${bold}==--==--${normal}\n${bold}==--==--   ${message} ${normal}\n${bold}==--==--${normal}\n${bold}${line}${normal}"
+    }
+}
+
+
+//---------------------------------------------------------------------------------------------------------------------------------
+// READCONFIG : charge le repertoire git de config dans $workspace/$configDir, et retourne le contenu du fichier de conf principal
+//---------------------------------------------------------------------------------------------------------------------------------
+def readConfig(String configFile) {
+
+    if (repoSource=="") repoSource = sh(returnStdout: true, script: 'git config remote.origin.url').trim();
+    if (repoSource[-4..-1] != ".git") repoSource="${repoSource}.git"
+    println "repoSource = ${repoSource}"
+    // Pour trouver le repo de configs env-dependantes, on ajoute -conf au nom du repo source
+    if (repoConf=="") {
+      repoConf = repoSource.take(repoSource.length()-4)+"-conf.git"
+      dir("${configDir}") { // charge dans le soussrep du workspace defini par constante configDir
+        git url : repoConf 
+      } 
+    }
+    println "repoConf = ${repoConf}"
+
+    configYAML = readYaml file: "${configDir}/${configFile}"
+
+    println "Contenu du fichier de config ${configFile} :"; println configYAML
+
+    return(configYAML)
+}
+
+
+//---------------------------------------------------------------------------------------------------------------------------------
+// ISFREETIER : renvoie true si le projet courant est en free tier donc avec tres peu de ressources
+//---------------------------------------------------------------------------------------------------------------------------------
+Boolean isFreeTier() {
+  return (openshift.selector("quota/${freeTierQuota}").count() == 1)
+}
+
+
+//---------------------------------------------------------------------------------------------------------------------------------
+// PREPAREBUILDINPUT : recupere les artefacts de artefactDir et les met dans buildDir en input pour un futur start-build
+//---------------------------------------------------------------------------------------------------------------------------------
+def prepareBuildInput(String artefactDir, String buildDir, String appType) {
+
+    sh(script: "mkdir -vp --mode=755 ${buildDir}")
+    if ("${appType}" ==~ 'nginx.*') {
+      sh(script: "cp -rv ${artefactDir}/* ${buildDir}")
+    }
+    else if ("${appType}" == 'docker') {
+      sh(script: "cp -rv ${artefactDir}/* ${buildDir}")
+    }
+    else if ("${appType}" ==~ 'redis.*') {
+      def rc = sh(script: "cp -rv ${artefactDir}/* ${buildDir}", returnStatus:true) // returnStatus pour eviter arret si pas de fichier
+    }
+    else if ("${appType}" ==~ 'mysql.*') {
+      def rc = sh(script: "cp -rv ${artefactDir}/* ${buildDir}", returnStatus:true) // returnStatus pour eviter arret si pas de fichier
+    }
+    else if ("${appType}" ==~ 'openjdk.*') {
+      sh(script: "mkdir -vp --mode=755 ${buildDir}/deployments")
+      sh(script: "cp -rv ${artefactDir}/*.jar ${buildDir}/deployments")
+    }
+    else if ("${appType}" ==~ 'tomcat.*') {
+      sh(script: "mkdir -vp --mode=755 ${buildDir}/deployments")
+      sh(script: "cp -rv ${artefactDir}/*.war ${buildDir}/deployments")
+      sh(script: "mkdir -vp --mode=755 ${buildDir}/configuration")
+      def rc = sh(script: "cp -rv ${artefactDir}/configuration/* ${buildDir}/configuration", returnStatus:true)
+    }
+    else {
+      println "ERROR prepareBuildInput : unknown appType ${appType}"
+      currentBuild.result = 'FAILURE'
+      sh "exit 8"
+    }
+    sh(script: "find ${buildDir} -type f -exec chmod 644 '{}' \\;")
+    sh(script: "find ${buildDir} -type d -exec chmod 755 '{}' \\;")
+    sh(script: "find ${buildDir} -ls")
+
+}
+
+
+//---------------------------------------------------------------------------------------------------------------------------------
+// BUILDAPP : builde une image dans la registry Openshift a partir des artefacts sous packageDir et des builder image
+//---------------------------------------------------------------------------------------------------------------------------------
+
+def buildApps(String configFile, String oneAppName="") {
+  timestamps {
+ 
+    printBanner2("BEGIN buildApps ${oneAppName}")
+    def configYAML = readConfig(configFile)
+    String clusterName = configYAML.cluster.name
+    String projectRoot = configYAML.projectRoot.name
+
+    if (sh(script: "test -f pom.xml", returnStatus:true) == 0) {
+      def pom = readMavenPom file: 'pom.xml'; artifactVersion = pom.version
+      println "Found pom.xml with artifact version ${artifactVersion}"
+    }
+    else {
+      println "Cannot find pom.xml, artifact version set to emtpy"
+      artifactVersion = '' 
+    }
+
+    openshift.withCluster(clusterName) {
+      openshift.withProject("${projectRoot}-cicd") {
+        echo "using project ${openshift.project()}"
+        int ix=0; int nbApp=configYAML.applications.size()
+        for (String application : configYAML.applications) {
+          applicationName = application.name
+          if (oneAppName != "") {
+            if(oneAppName != applicationName) {
+              println "NOTE : application ${applicationName} non traitee car une application unique a ete passee en parametre (${oneAppName})"
+              continue;
+            }
+            ix=0; nbApp=1
+          }
+          ix++; printBanner("STAGE BUILD IMAGE OPENSHIFT ${ix}/${nbApp} : ${applicationName} ${artifactVersion}")
+          stage ("Build image ${ix}/${nbApp} ${applicationName}")  {
+
+            def artefact_dir = "${packageDir}/${applicationName}" // repertoire fichiers a donner en input au start-build OCP
+            def build_dir = "${buildInputDir}/${applicationName}" // repertoire fichiers a donner en input au start-build OCP
+            def bc = openshift.selector("bc/${applicationName}")
+            appType = bc.object().metadata.labels['app_type']
+            println "Le label app_type du BC donne appType=${appType}"  
+            prepareBuildInput(artefact_dir,build_dir,appType)
+
+            bc.describe()
+            println "Lancement du start-build"
+            def buildSelector = bc.startBuild("--from-dir=${build_dir}")
+            def newBuild = buildSelector.object()
+            echo "created a ${newBuild.kind} with name ${newBuild.metadata.name} and status ${newBuild.status.phase}"
+            echo "The object has labels: ${newBuild.metadata.labels}"
+            println "Attente du build Complete..."  
+            timeout(10) { 
+              buildSelector.untilEach(1) { // attend que tous soient termines (Complete ou Failed ou Cancelled)
+                //println "boucle untilEach...${it.name()}"
+                def buildStatus=it.object().status.phase
+                def build_fini = (buildStatus == "Complete" || buildStatus == "Failed" || buildStatus == "Cancelled")
+                if (!build_fini) println "[untilEach] build pod encore en cours : ${it.name()}, status: ${buildStatus}"
+                return (build_fini)
+              }
+            }
+            newBuild = buildSelector.object()
+            def newBuildName="${newBuild.kind}/${newBuild.metadata.name}"
+            def nbStatus=newBuild.status.phase
+            println "===> Fin de boucle untilEach avec statut ${newBuildName} = " + nbStatus
+            buildSelector.describe()
+            //println "${newBuildName} duree (sec.) = " + (newBuild.status.duration / 1000000000)
+            //println "${newBuildName} image digest = " + newBuild.status.output.to.imageDigest
+            //println "${newBuildName} image ref    = " + newBuild.status.outputDockerImageReference
+            if (nbStatus != 'Complete') {
+              currentBuild.result = 'FAILURE'
+              sh "exit 8"
+            }
+            if (artifactVersion != '') echo openshift.raw('tag',"${applicationName}:latest","${applicationName}:${artifactVersion}").out;
+            else println "NOTE : pas de tag mis sur l'image car artifactVersion vide";
+            //bc.logs()
+            buildSelector.logs()
+            echo openshift.raw('describe','is',"${applicationName}").out
+
+          } //stage
+        } //for applicationName
+        echo openshift.raw('status','-v').out
+
+      } //withproject
+    } //withcluster
+    printBanner2("END buildApps")
+  } //timestamps
+}
+
+
+//---------------------------------------------------------------------------------------------------------------------------------
+// ROLLOUTCONFIG :
+// Retourne un nouveau nom d'objet a creer (croissant, ex <objPrefix>-25 si le dernier existant est -24),
+// tout en detruisant les objets non references par un volume d'un RC, avec <objType> = configmap ou secret
+//--------------------------------------------------------------------------------------------------------------------------------
+String rolloutConfig(String appName, String objType) {
+
+    def objPrefix = ''
+    if (objType == "configmap") objPrefix = "${appName}-conf"
+    else if (objType == "secret") objPrefix = "${appName}-secret"
+    else { println "ERROR: invalid objType ${objType} in rolloutConfig(), must be configmap or secret"; sh "exit 8" }
+    def objPrefixWords = objPrefix.split('-').size()
+
+    // Ici on cree une liste usedObj avec les configmap ou secrets utilises par les RC
+    ArrayList usedObj = []
+    rcSel = openshift.selector('rc', [ app: "${appName}" ]);    // sinon on peut garder tous les CM/SE de tous les RC
+    rcSel.withEach {
+      def Volumes = it.object().spec.template.spec.volumes
+      for (i=0; i < Volumes.size(); i++) {
+        def Vol = Volumes[i]
+        if (Vol.name == "appconf" && objType == "configmap") {
+          println "${it.name()} uses configmap ${Vol.configMap.name}"; usedObj.add(Vol.configMap.name) //ne pas mettre en "${}"
+        }
+        else if (Vol.name == "appsecret" && objType == "secret") {
+          println "${it.name()} uses secret ${Vol.secret.secretName}"; usedObj.add(Vol.secret.secretName) //ne pas mettre en "${}"
+        }
+      }
+    }
+
+    // Ici on elimine les configmap ou secrets non utilises par un des RC
+    int mxNum=0
+    cfSel = openshift.selector("${objType}", [ app: "${appName}" ])
+    cfSel.withEach {
+      String Conf = it.object().metadata.name
+      if (Conf.startsWith(objPrefix)) {
+        def w = Conf.split('-'); int ws = w.size(); String wl = w[ws-1];  // wl est le suffixe apres le dernier tiret
+        try {
+          if (Conf==objPrefix) wli = 0 ;  // si <app>-conf tout court, on fait comme si -0
+          else wli = (wl as int) // va en catch() si fin du nom n'est pas un entier
+          if (ws==objPrefixWords+1 || Conf==objPrefix) { 
+            if (wli>mxNum) { mxNum=wli; }
+            if (Conf in usedObj) { println "${objType} ${Conf} not deleted because used in a RC"; }
+            else {
+              echo openshift.raw('delete',"${objType}","${Conf}").out
+            }
+          }
+          else { println "${objType} ${Conf} ignored (not in ${objPrefixWords+1} dash-separated parts)"; }
+        }
+        catch ( Exception e) { println "${objType} ${Conf} ignored because catched ${e}"; }
+      }
+      else { println "${objType} ${Conf} ignored (does not begin with ${objPrefix})"; }
+    }
+
+    mxNum++; return "${objPrefix}-${mxNum}"  // on retourne le prochain nom dispo pour creation 
+
+} 
+
+
+//---------------------------------------------------------------------------------------------------------------------------------
+// DEPLOYAPP : deloie les pods correspondant a l'image buildee et aux confs injectees
+//---------------------------------------------------------------------------------------------------------------------------------
+def deployApps(String configFile, String environmentName="dev", String targetImageTag=":latest", String oneAppName="") {
+  timestamps {
+
+    printBanner2("BEGIN deployApps ${environmentName} ${oneAppName}")
+    def configYAML = readConfig(configFile)
+    String clusterName = configYAML.cluster.name
+    String projectRoot = configYAML.projectRoot.name
+
+    def projectName="${projectRoot}-${environmentName}"
+    openshift.withCluster(clusterName) {
+      openshift.withProject("${projectName}") {
+        println "using project ${openshift.project()}"
+        echo openshift.raw('describe', 'quota').out
+        int ix=0; int nbApp=configYAML.applications.size()
+        for (String application : configYAML.applications) {
+          applicationName = application.name
+          if (oneAppName != "") {
+            if(oneAppName != applicationName) {
+              println "NOTE : application ${applicationName} non traitee car une application unique a ete passee en parametre (${oneAppName})"
+              continue;
+            }
+            ix=0; nbApp=1
+          }
+          ix++; printBanner("STAGE DEPLOY OPENSHIFT ${ix}/${nbApp} : ${applicationName}")
+          stage ("Deploy ${ix}/${nbApp} ${applicationName}") {
+
+            //
+            // Creation (et rotation) configmap/secret 
+            //
+            def cf_base_dir = "${configDir}/${applicationName}/${environmentName}"  // relatif au root du git -conf
+            sh(script: "find ${cf_base_dir} -ls")
+
+            String newCMname = rolloutConfig(applicationName, 'configmap')
+
+            echo openshift.raw('create', 'configmap',"${newCMname}","--from-file=${cf_base_dir}/appconf/").out;
+            echo openshift.raw('set', 'volume', "dc/${applicationName}", '--add', '--name=appconf', "--configmap-name=${newCMname}", '--overwrite').out
+            echo openshift.raw('label', 'cm', "${newCMname}", "deploy=${applicationName}", "app=${applicationName}").out
+
+            secretDir = "${cf_base_dir}/appsecret"
+            Boolean hasSecretDir = (sh(script: "test -d ${secretDir}", returnStatus:true) == 0)
+            String newSEname = rolloutConfig(applicationName, 'secret')
+            if (hasSecretDir) echo openshift.raw('create', 'secret','generic',"${newSEname}","--from-file=${secretDir}/").out;
+            else { 
+              println "Pas de repertoire ${secretDir} pour faire un Secret, il doit donc etre mis vide" 
+              echo openshift.raw('create', 'secret','generic',"${newSEname}").out
+            }
+            echo openshift.raw('set', 'volume', "dc/${applicationName}", '--add', '--name=appsecret', "--secret-name=${newSEname}", '--overwrite').out
+            echo openshift.raw('label', 'secrets', "${newSEname}", "deploy=${applicationName}", "app=${applicationName}").out
+            echo openshift.raw('secret', 'link', 'default', "${newSEname}").out
+
+            //
+            // Preparation du deploiement
+            //
+            def dc = openshift.selector("dc/${applicationName}")
+            def rollMgr = dc.rollout()
+            println "Etat des pods :"
+            echo openshift.raw('get', 'po', '-l', "app=${applicationName}").out
+            println "Historique des rollouts :"
+            rollMgr.history()
+            
+            // Positionnement du tag sur image cible, avec conservation de l'ancienne dans rollbackImg au cas ou
+            try {
+              rollbackImgSHA = openshift.raw('get', 'istag', "${applicationName}:${environmentName}", '--no-headers','-o','custom-columns=IMG:.image.metadata.name',"-n ${projectRoot}-cicd").out
+              rollbackImg="${applicationName}@${rollbackImgSHA}"
+              println "Image actuellement (avant rollout) pointee par ${applicationName}:${environmentName}, sera remise si rollback :"
+              println rollbackImg
+            }
+            catch (e) {
+              println "Erreur: ${e}"
+              rollbackImg="${applicationName}${targetImageTag}"
+              println "Aucune image taggee ${applicationName}:${environmentName}, on prend celui passe en parametre (${targetImageTag}) comme rollback"
+            }
+            println "On positionne le tag de l'environnement sur le tag passe en paramatre (${targetImageTag}) pour que le rollout le prenne"
+            echo openshift.raw('tag',"${applicationName}${targetImageTag}","${applicationName}:${environmentName}",'-n',"${projectRoot}-cicd").out
+
+            //
+            // Deploiement proprement dit (rollout latest)
+            //
+            println "Lancement du rollout latest"
+            rollMgr.latest()
+            latestDeploymentVersion = dc.object().status.latestVersion
+            desiredReplicas = dc.object().spec.replicas
+            dc.describe()
+            def rc = openshift.selector("rc/${applicationName}-${latestDeploymentVersion}")
+            println "===> Attente de fin du ${rc.name()} (desiredReplicas = ${desiredReplicas})..."
+            def wait_minutes = 4 + desiredReplicas
+            try {
+              timeout(wait_minutes) {
+                rc.untilEach(1) {
+                  def rcObj = it.object()
+                  rcstatus = rcObj.metadata.annotations['openshift.io/deployment.phase']
+                  println "[untilEach] RC name: ${rcObj.metadata.name}, status: ${rcstatus}, replicas: ready=${rcObj.status.readyReplicas} / started=${rcObj.status.replicas} / desired=${desiredReplicas}"
+                  echo openshift.raw('get', 'po', '-l', "app=${applicationName}").out
+                  return (rcstatus != 'Pending' && rcstatus != 'Running')
+                }
+              }
+            }
+            // ici si erreur rollout
+            catch(err) {
+               println "Erreur lors du deploy #${latestDeploymentVersion} : ${err}"
+               rc = openshift.selector("rc/${applicationName}-${latestDeploymentVersion}")
+               rcstatus = rc.object().metadata.annotations['openshift.io/deployment.phase']
+               println "Statut de rc/${applicationName}-${latestDeploymentVersion} ===> ${rcstatus}"
+               currentBuild.result = 'FAILURE'
+               println "Liste des ReplicationControlers :"
+               echo openshift.raw('get', 'rc','-l',"app=${applicationName}").out
+               println "Liste de tous les pods :"
+               echo openshift.raw('get', 'po','-l',"deploymentconfig=${applicationName}").out
+               println "Historique res rollouts :"
+               dc.rollout().history()
+               println "Pour le rollback, on remet le tag de l'environnement sur l'image d'avant le rollout :"
+               echo openshift.raw('tag',"${rollbackImg}","${applicationName}:${environmentName}",'-n',"${projectRoot}-cicd").out
+               println "On fait un rollout cancel :"
+               dc.rollout().cancel()
+               println "On attend 10 secondes avant de faire un bilan (rollback automatique sur les anciennes images et conf) :"
+               sleep(10)
+               dc.rollout().history()
+               echo openshift.raw('get', 'po', '-l', "app=${applicationName}").out
+               dc.describe()
+               println "Liste des ReplicationControlers :"
+               echo openshift.raw('get', 'rc','-l',"app=${applicationName}").out
+               throw err
+            }
+            // ici si pas d'erreurs lors du rollout
+            if (desiredReplicas > 0) {
+              println "Log de demarrage du pod applicatif :"
+              dc.logs()
+            }
+            println "------------------------"
+            println "Historique des rollout :"
+            dc.rollout().history()
+            println "Liste des ReplicationControlers :"
+            echo openshift.raw('get', 'rc','-l',"app=${applicationName}").out
+
+          } //stage
+        } //for applicationName
+        echo openshift.raw('status','-v').out
+        
+      } //withProject
+    } //withCluster
+    printBanner2("END deployApps")
+  } //timestamps
+}
+
+return this

@@ -1,0 +1,39 @@
+#!/usr/bin/env groovy
+
+// Use node dedicated to Java compilation
+node('SlaveABS') {
+    def mailRecipients = 'demarju@allianz.fr'
+
+    properties([
+            parameters([
+                    string(defaultValue: "", description: 'Systeme applicatif ?', name: 'systemeApplicatif'),
+                    string(defaultValue: "", description: 'Nom application ?', name: 'nomApplication'),
+                    // choices are newline separated
+                    //choice(choices: 'openjdk18\ntomcat8', description: 'Type de template', name: 'typeTemplate'),
+                    choice(choices: 'intg\nrecf\nrect\nprod', description: 'Environnement ?', name: 'environnement'),
+                    choice(choices: '250m\n500m\n750m\n999m', description: 'cpu limite ?', name: 'cpuLimit'),
+                    choice(choices: '512Mi\n768Mi\n1Gi\n1532Mi\n2Gi', description: 'Memoire limite ?', name: 'memLimit'),
+                    choice(choices: '1\n2\n4', description: 'Nombre de replicats/pods ?', name: 'nbPods')
+            ])
+    ])
+
+    try{
+        // Download source code
+        stage('Preparation') {
+            checkout scm
+        }
+
+        stage('create env') {
+            def common = load("${pwd()}/jenkinsfile-openshift-common-create")
+            common.createEnv("${params.environnement}", "${params.systemeApplicatif}", "${params.nomApplication}")
+        }
+
+    } catch (e) {
+        // Tell Mailer that something went wrong
+        currentBuild.result = 'FAILURE'
+        throw e
+    } finally {
+        // Send mail if task broke or is repaired
+        step([$class: 'Mailer', notifyEveryUnstableBuild: true, recipients: mailRecipients, sendToIndividuals: true])
+    }
+}

@@ -1,0 +1,34 @@
+#!/usr/bin/env groovy
+
+node('SlaveOCPT') {
+
+  String configFile = 'openshift-config.yaml'   // YAML contient tous les parametres pour objets de l'application dans OpenShift
+  
+  try {
+
+    stage('Git Source checkout') {
+          deleteDir()
+          checkout scm
+    }
+
+    // Chargement des scripts communs OpenShift dans le sous-repertoire 'repoScripts' du Workspace
+    //dir('repoScripts') { git url : 'http://bitbucket.agf.fr/scm/y6/y6-ocp-azf-scripts-groovy.git' }
+    //def commonOCP = load("repoScripts/jenkinsfile-openshift-common-init")  // script de fonctions OCP
+    def commonOCP = load("jenkinsfile-openshift-common-init") //ATTENTION LOCAL
+
+    commonOCP.applyFromConfig(configFile)
+
+    currentBuild.result = 'SUCCESS'
+
+  }
+  catch(e) {
+    currentBuild.result = 'FAILURE'
+    throw e
+  }
+  finally {
+    wrap([$class: 'BuildUser']) { mailRecipients = "${BUILD_USER_EMAIL}" }
+    step([$class: 'Mailer', notifyEveryUnstableBuild: true, recipients: mailRecipients, sendToIndividuals: true])
+  }
+
+} //node()
+

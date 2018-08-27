@@ -1,0 +1,63 @@
+#!/usr/bin/env groovy
+
+// Utiliser un node Linux et pas Windows...
+node('SlaveOCPT') {
+    
+    String configFile = 'openshift-config.yaml'   // YAML contient tous les parametres pour objets de l'application dans OpenShift
+
+    def environmentName = 'dev'           // defaut 'dev', environnement (namespace) cible dans lequel deployApps va deployer
+    def targetImageTag = ':latest'        // defaut ':latest', tag des images que deployApps va tirer pour les deployer
+    def oneAppName = ''                   // laisser a vide ('') pour tout traiter, sinon mettre une des applis du projet pour ne traiter qu'elle
+
+    try {
+ 
+        stage('Git Source checkout') {
+            deleteDir()
+            checkout scm
+        }
+
+        //stage("Build Maven") {
+        //    wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'xterm']) {
+        //        def common = load("${pwd()}/jenkinsfile-common")
+        //        timestamps { common.mavenTask("clean deploy") }  // -Dmaven.test.failure.ignore=true
+        //    }
+        //}
+
+        stage("Build sans Maven") {
+            wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'xterm']) {
+              sh(script: "rm -rf package")
+              sh(script: "mkdir -p package/nginx")
+              sh(script: "cp -prv rawgraphs/* package/nginx")
+              sh(script: "cp -prv nginx/* package/nginx")
+            }
+        }
+
+       
+
+        // NOTE : les fonctions commonOCP qui suivent generent les instructions "stage()" de la suite du pipeline
+
+        // Chargement des scripts communs OpenShift dans le sous-repertoire 'repoScripts' du Workspace
+        //dir('repoScripts') { git url : 'http://bitbucket.agf.fr/scm/y6/y6-ocp-azf-scripts-groovy.git' }
+        //def commonOCP = load("repoScripts/jenkinsfile-openshift-common-build")  // script de fonctions OCP
+        def commonOCP = load("jenkinsfile-openshift-common-build") //ATTENTION LOCAL
+
+
+        // Construit et tag une image de l'app dans OpenShift a partir du resultat du build maven
+        commonOCP.buildApps(configFile,oneAppName)
+
+        // Configure et deploie (rollout) un ou des pods de l'app a partir de l'image et de la config dans OpenShift
+        commonOCP.deployApps(configFile,environmentName,targetImageTag,oneAppName)
+
+        currentBuild.result = 'SUCCESS'
+
+    } 
+    catch(e) {
+        currentBuild.result = 'FAILURE'
+        throw e
+    } 
+    finally {
+        wrap([$class: 'BuildUser']) { mailRecipients = "${BUILD_USER_EMAIL}" }
+        step([$class: 'Mailer', notifyEveryUnstableBuild: true, recipients: mailRecipients, sendToIndividuals: true])
+    }
+ 
+} //node()

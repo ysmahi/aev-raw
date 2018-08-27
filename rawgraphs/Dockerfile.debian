@@ -1,0 +1,41 @@
+FROM nginx:mainline
+
+# ouvre en rwx pour les membre du groupe root
+RUN chmod g+rwx /var/cache/nginx /var/run /var/log/nginx
+
+# on ne peut pas utiliser le port 80 donc on met 8080
+RUN sed -i.bak 's/listen\(.*\)80;/listen 8080;/' /etc/nginx/conf.d/default.conf
+EXPOSE 8080
+
+# commente directive 'user nginx' car on tourne en user non-root dans OCP
+RUN sed -i.bak 's/^user/#user/' /etc/nginx/nginx.conf
+
+# le user nginx (101) sera dans le groupe root (ne sert a rien???)
+RUN addgroup nginx root
+
+# shell script qui descent et decompresse
+COPY ./contrib/download_zip_file.sh /tmp/
+RUN chmod 755 /tmp/download_zip_file.sh
+
+#RUN yum-config-manager --enable rhel-server-rhscl-7-rpms \
+#  &&  yum-config-manager --enable rhel-server-rhscl-8-rpms \
+#  &&  yum-config-manager --enable rhel-7-server-optional-rpms \
+#  &&  yum-config-manager --disable epel >/dev/null || : \
+#  &&  yum install -y git \
+#  &&  yum clean all -y
+
+RUN apt install curl
+
+# Installe un ou des nodeJS
+RUN VERSION="8.11.3" SHACMD=sha256sum SHA=1ea408e9a467ed4571730e160993f67a100e8c347f6f9891c9a83350df2bf2be \
+    SOURCEURL=https://nodejs.org/dist/v${VERSION}/node-v${VERSION}-linux-x64.tar.gz \
+    TARGETD=/usr/share/node-${VERSION} \
+    /tmp/download_zip_file.sh 
+
+RUN VERSION="8.11.3" PATH=$PATH:/usr/share/node-${VERSION}/bin npm install -g bower
+
+RUN chmod -R 775 $HOME/.config
+#RUN chown -R 1001:0 $HOME && chmod -R g+rw $HOME && chmod -R 775 $HOME/.config
+
+
+USER nginx

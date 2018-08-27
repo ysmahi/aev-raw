@@ -1,0 +1,57 @@
+#!/usr/bin/env groovy
+
+// Use node dedicated to Java compilation
+node('SlaveABS') {
+    def mailRecipients = 'demarju@allianz.fr'
+    def JAVA_HOME=tool 'JDK1.8.0_131'
+
+    properties([
+        parameters([
+            string(defaultValue: "", description: 'Systeme applicatif ?', name: 'systemeApplicatif'),
+            string(defaultValue: "", description: 'Nom application ?', name: 'nomApplication'),
+            // choices are newline separated
+            choice(choices: 'openjdk18\ntomcat8', description: 'Type de template', name: 'typeTemplate')
+
+        ])
+    ])
+
+    try{
+        // Download source code
+        stage('Preparation') {
+            checkout scm
+        }
+
+        stage('create env cicd') {
+            withEnv(["PATH=${env.PATH}"]) {
+                openshift.withCluster('CRP') {
+                    def appName = "azf-${params.systemeApplicatif}-${params.nomApplication}"
+
+                    //do not delete -> cause raw task will fail on execution
+                    openshift.withProject('azf-cicd') {
+                        openshift.newProject("${appName}-cicd")
+                    }
+                    openshift.withProject("${appName}-cicd") {
+                        println "Recuperation du model yaml"
+                        def modelAppYaml = openshift.process( "azf-cicd//${typeTemplate}-azf-cicd", "-p", "APPLICATION_NAME=${appName}" )
+                        println "creation de l environnement"
+                        def created = openshift.create( modelAppYaml )
+                        println "ajout des roles"
+                        def rolesCommand = openshift.raw('adm', 'policy', 'add-role-to-user', 'admin','julien.demare_2@allianz.fr','laurent.cessat_2@allianz.fr','mohammed.bellamri@allianz.fr','eric.bouffetier@allianz.fr', 'franck.gerodou@allianz.fr')
+                    }
+                }
+            }
+        }
+        stage ('create env dev'){
+            def common = load("${pwd()}/jenkinsfile-openshift-common-create")
+            common.createEnv('dev', "${params.systemeApplicatif}", "${params.nomApplication}")
+        }
+
+    } catch (e) {
+        // Tell Mailer that something went wrong
+        currentBuild.result = 'FAILURE'
+        throw e
+    } finally {
+        // Send mail if task broke or is repaired
+        step([$class: 'Mailer', notifyEveryUnstableBuild: true, recipients: mailRecipients, sendToIndividuals: true])
+    }
+}

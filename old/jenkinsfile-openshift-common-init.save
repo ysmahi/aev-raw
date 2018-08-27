@@ -1,0 +1,114 @@
+#!/usr/bin/env groovy
+
+// Constantes :
+
+configDir = "repoConf"       // sous-repertoire de $WORKSPACE contenant le repo -conf
+freeTierQuota = "dev-quotas" // si cet objet quota est present alors on est en free tier avec tres peu de ressource
+
+
+// Variables globales, valorisees une fois par pipeline, declarer et laisser vide ici
+
+repoSource = ""
+repoConf = ""
+
+//---------------------------------------------------------------------------------------------------------------------------------
+// PRINTBANNER : affiche une banniere bien visible dans la log du job sous Jenkins
+//---------------------------------------------------------------------------------------------------------------------------------
+
+def printBanner(String message) {  // pour marquer stages pipeline
+    def line="==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--=="
+    def boldblue="\u001B[1m\u001B[34m"; def normal="\u001B[0m";
+    ansiColor('xterm') {
+      println "${boldblue}${line}${normal}\n${boldblue}${line}${normal}\n${boldblue}==--==--${normal}\n${boldblue}==--==--   ${message} ${normal}\n${boldblue}==--==--${normal}\n${boldblue}${line}${normal}\n${boldblue}${line}${normal}"
+    }
+}
+def printBanner2(String message) {  // pour BEGIN/END fonctions, en noir pas en bleu, et moins de lignes
+    def line="==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--=="
+    def bold="\u001B[1m"; def normal="\u001B[0m";
+    ansiColor('xterm') {
+      println "${bold}${line}${normal}\n${bold}==--==--${normal}\n${bold}==--==--   ${message} ${normal}\n${bold}==--==--${normal}\n${bold}${line}${normal}"
+    }
+}
+
+
+//---------------------------------------------------------------------------------------------------------------------------------
+// READCONFIG : charge le repertoire git de config dans $workspace/$configDir, et retourne le contenu du fichier de conf principal
+//---------------------------------------------------------------------------------------------------------------------------------
+def readConfig(String configFile) {
+
+    if (repoSource=="") repoSource = sh(returnStdout: true, script: 'git config remote.origin.url').trim();
+    if (repoSource[-4..-1] != ".git") repoSource="${repoSource}.git"
+    println "repoSource = ${repoSource}"
+    // Pour trouver le repo de configs env-dependantes, on ajoute -conf au nom du repo source
+    if (repoConf=="") {
+      repoConf = repoSource.take(repoSource.length()-4)+"-conf.git"
+      dir("${configDir}") { // charge dans le soussrep du workspace defini par constante configDir
+        git url : repoConf
+      }
+    }
+    println "repoConf = ${repoConf}"
+
+    configYAML = readYaml file: "${configDir}/${configFile}"
+
+    println "Contenu du fichier de config ${configFile} :"; println configYAML
+
+    return(configYAML)
+}
+
+
+//---------------------------------------------------------------------------------------------------------------------------------
+// ISFREETIER : renvoie true si le projet courant est en free tier donc avec tres peu de ressources
+//---------------------------------------------------------------------------------------------------------------------------------
+Boolean isFreeTier() {
+  return (openshift.selector("quota/${freeTierQuota}").count() == 1)
+}
+
+
+//---------------------------------------------------------------------------------------------------------------------------------
+// SPLITIMAGETAG : renvoie un tableau de 3 Strings avec 1) image full name, 2) image name, 3) tag (quel que soit le format de la string entree)
+// ex "docker-registry.default.svc:5000/azf-y6-springboot-cicd/nginx:dev" renvoie :
+// [ "docker-registry.default.svc:5000/azf-y6-springboot-cicd/nginx", "nginx", ":dev" ]
+// ex2 "nginx" renvoie :
+// [ "nginx", "nginx", "" ]
+//---------------------------------------------------------------------------------------------------------------------------------
+String[] splitImageTag(String imageString) {
+  //println "Called splitImageTag(${imageString})"
+  String[] imageString_words = imageString.split('/')
+  int imageString_words_size = imageString_words.size()
+  String imageNameLeft = ""
+  if (imageString_words_size > 1) {
+    imageNameLeft = imageString_words[0]
+    for (i = 1; i < imageString_words_size-1; i++) imageNameLeft = imageNameLeft+"/"+imageString_words[i]
+  }
+  String image = imageString_words.last()
+  String[] image_words = image.split(':')
+  String imageName = image_words[0]
+  String imageFullName = imageName
+  if (imageNameLeft != "") imageFullName = imageNameLeft+"/"+imageFullName
+  String imageTag = ""
+  if (image_words.size() == 2) imageTag = ":${image_words.last()}";
+  //println "==> imageFullName=${imageFullName} imageName=${imageName} imageTag=${imageTag}"
+  return [ imageFullName, imageName, imageTag ] as String[]
+}
+
+//---------------------------------------------------------------------------------------------------------------------------------
+// UPDATEIFNEEDED : fait un oc patch si les valeurs parm3 (config) et parm4 (current) sont differents, applique le patch parm5
+// parm1: type d'objet sur lequel le patch est applique (bc ou dc)
+// parm2: nom du parametre de config yaml en jeu (uniquement pour affichage)
+// parm3: valeur de ce parametre dans le config yaml
+// parm4: valeur de l'equivalent dans l'objet courant (bc ou dc)
+// parm5: patch a appliquer sur parm3 different de parm4 (normalement applique parm3)
+//---------------------------------------------------------------------------------------------------------------------------------
+def updateIfNeeded(String objType, String configKey, String configValue, String currentValue, String jsonPatch) {
+  println "${appName}: ${envName}: ${configKey}  config=${configValue}"
+  println "${appName}: ${envName}: ${configKey} current=${currentValue} (from ${objType})"
+  if (configValue != currentValue) {
+    println "${appName}: ${envName}: ==> patching the ${configKey} in ${objType} object..."
+    updated = openshift.raw('patch', objType, appName, '-p', jsonPatch)
+    ansiColor('xterm') { echo "${ansiboldgreen}${updated.out}${ansinormal}" }
+    updatesDone << "${openshift.project()}/${objType}/${appName} : updated ${configKey} from ${currentValue} to ${configValue}"
+  }
+  else println "${appName}: ${envName}: no ${objType} update needed for ${configKey}"
+}
+
+return this

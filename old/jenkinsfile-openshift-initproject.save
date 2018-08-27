@@ -1,0 +1,277 @@
+#!/usr/bin/env groovy
+
+node('SlaveOCPT') {
+
+  String configFile = 'openshift-config.yaml'   // YAML contient tous les parametres pour objets de l'application dans OpenShift
+
+  updatesDone = []
+  ansiboldgreen="\u001B[1m\u001B[32m"; ansinormal="\u001B[0m";
+
+
+  try {
+
+    stage('Git Source checkout') {
+          deleteDir()
+          checkout scm
+    }
+
+    // Chargement des scripts communs OpenShift dans le sous-repertoire 'repoScripts' du Workspace
+    //dir('repoScripts') { git url : 'http://bitbucket.agf.fr/scm/y6/y6-ocp-azf-scripts-groovy.git' }
+    //def commonOCP = load("repoScripts/jenkinsfile-openshift-common-init")  // script de fonctions OCP
+    def commonOCP = load("jenkinsfile-openshift-common-init") //ATTENTION
+
+    configYAML = commonOCP.readConfig(configFile)
+    String clusterName = configYAML.cluster.name
+    String projectRoot = configYAML.projectRoot.name 
+
+
+    openshift.withCluster(clusterName) {
+
+      ixApp=0; int nbApp=configYAML.applications.size()
+      echo "Project has ${nbApp} apps"
+
+      for (String application : configYAML.applications) {
+        ixApp++; appName = application.name
+        commonOCP.printBanner("Processing ${appName} (${ixApp}/${nbApp})")
+
+        stage("${ixApp}/${nbApp} ${appName} objects") {
+
+          //
+          // Partie BUILD
+          //
+
+          commonOCP.printBanner2("${appName} build objects")
+
+          appType = application.app_type
+          assert appType != null : "${appName}: app_type is mandatory"
+          openshift.raw('get','template',"${appType}-azf-env",'-n','azf-cicd')
+          println "${appName}: app_type=${appType}"
+
+
+          openshift.withProject("${projectRoot}-cicd") {
+
+            echo "Using project ${openshift.project()}"
+
+            builderTag = application.builder_tag
+            if (builderTag != null) {
+               assert appType != 'docker' : "${appName}: setting a builder_tag is incompatible with app_type docker"
+               assert builderTag[0] == ':' : "${appName}: builder_tag must begin with a ':'"
+            }
+            else builderTag=":stable" 
+            println "${appName}: builder_tag=${builderTag}"
+
+            if (appType=="docker") buildTemplateName = "docker-bin-azf-cicd"
+            else buildTemplateName = "s2i-bin-azf-cicd"
+
+            bc = openshift.selector("bc/${appName}")
+             
+            if (bc.count() == 0) { // c'est une creation
+              println "${appName}: Creating BuildConfig and ImageStream objects..."
+              def modelAppYaml = openshift.process( "azf-cicd//${buildTemplateName}", '--loglevel=1',
+                "-p=APPLICATION_NAME=${appName}", "-p=APP_TYPE=${appType}", "-p=BUILDER_TAG=${builderTag}")
+              created = openshift.create(modelAppYaml)
+              ansiColor('xterm') { echo "${ansiboldgreen}${created.out}${ansinormal}" }
+              updatesDone << "${openshift.project()} build objects for ${appName} : created"
+            }
+            else { // bc existe deja
+              currentAppType = bc.object().metadata.labels['app_type']
+              String bc_image = bc.object().spec.strategy.sourceStrategy.from.name
+              s = commonOCP.splitImageTag(bc_image)   // [0]=imgfullname [1]=imgname [2]=tag 
+              currentBuilderImage = s[0]; currentBuilderTag = s[2]
+              println "${appName}: BuildConfig current image = ${bc_image}"
+              assert (appType == currentAppType) : "app_type in YAML config must be identical to BuildConfig's app_type label (${currentAppType}"
+              envName="cicd" // pour eviter de planter updateIfNeeded car l'utilise pour affichage
+              commonOCP.updateIfNeeded("bc","builder_tag", builderTag, currentBuilderTag,
+                '\'{"spec": {"strategy": {"sourceStrategy": {"from": {"name": "'+currentBuilderImage+builderTag+'"}}}}}\'')
+            }
+
+          } //withProject cicd
+
+          //
+          // Partie DEPLOY
+          //
+             
+          for (String env : application.environments) {
+
+            envName = env.name
+            commonOCP.printBanner2("${appName} ${envName} deploy objects")
+            envProjName = "${projectRoot}-${envName}"
+
+            openshift.withProject("${projectRoot}-cicd") {
+              if (openshift.selector("rolebinding/system:image-puller-${envName}").count() ==0) {
+                updated = openshift.raw('adm', 'policy', 'add-role-to-user', 'system:image-puller',
+                 "system:serviceaccounts:${envProjName}","--rolebinding-name=system:image-puller-${envName}")
+                ansiColor('xterm') { echo "${ansiboldgreen}${updated.out}${ansinormal}" }
+                updatesDone << "${openshift.project()} added role system:image-puller to system:serviceaccounts:${envProjName}"
+              }
+            } // withProject cicd
+
+            openshift.withProject("${envProjName}") {
+
+              echo "Using project ${openshift.project()}"
+              assert commonOCP.isFreeTier() == false : "Project ${openshift.project()} is at free tier, this is not compatible with -env projects"
+
+              imgTag = env.image_tag
+              if (imgTag != null) assert imgTag[0] == ':' : "${appName}: ${envName}: image_tag must begin with a ':'";
+              else imgTag = ":${envName}";
+              println "${appName}: ${envName}: image_tag=${imgTag}"
+
+              cpuReq = env.cpu_request
+              cpuLim = env.cpu_limit
+              assert env.mem_request == null : "${appName}: ${envName}: use memory_request, not mem_request"
+              memReq = env.memory_request
+              assert env.mem_request == null : "${appName}: ${envName}: use memory_limit, not mem_limit"
+              memLim = env.memory_limit
+
+              if (cpuReq == null) { 
+                if (cpuLim != null) cpuReq=cpuLim;
+                else cpuReq = "200m";
+              }
+              if (cpuLim == null) cpuLim="1";
+              if (memReq == null) {
+                if (memLim != null) memReq=memLim;
+                else memReq = "256Mi";
+              }
+              if (memLim == null) memLim="512Mi";
+
+              println "${appName}: ${envName}: cpu_request=${cpuReq}"
+              println "${appName}: ${envName}: cpu_limit=${cpuLim}"
+              println "${appName}: ${envName}: memory_request=${memReq}"
+              println "${appName}: ${envName}: memory_limit=${memLim}"
+
+              initDelay = env.initial_delay
+              if (initDelay == null) {
+                switch (appType) {
+                  case ~/mysql.*$/: initDelay=15; break;
+                  case ~/nginx.*$/: initDelay=10; break;
+                  case ~/openjdk.*$/: initDelay=30; break;
+                  case ~/redis.*$/: initDelay=10; break;
+                  case ~/tomcat.*$/: initDelay=40; break;
+                  default: initDelay=30; break;
+                }
+              }
+              println "${appName}: ${envName}: initial_delay=${initDelay}"
+
+              replicaCount = env.replica_count
+              if (replicaCount == null) replicaCount=1;
+              println "${appName}: ${envName}: replica_count=${replicaCount}"
+
+              deployStrategy = env.deploy_strategy
+              if (deployStrategy == null) deployStrategy="Rolling";
+              assert deployStrategy == "Rolling" || deployStrategy == "Recreate" : "${appName}: ${envName}: deploy_strategy must be Rolling or Recreate"
+              println "${appName}: ${envName}: deploy_strategy=${deployStrategy}"
+
+              dc = openshift.selector("dc/${appName}")
+             
+              if (dc.count() == 0) { // c'est une creation
+                println "${appName}: ${envName}: Creating deployment objects..."
+                def modelAppYaml = openshift.process( "azf-cicd//${appType}-azf-env", '--loglevel=1',
+                  "-p=PROJECT_ROOT=${projectRoot}","-p=APPLICATION_NAME=${appName}", "-p=APP_ENV=${envName}", "-p=APP_TYPE=${appType}",
+                  "-p=IMAGE_TAG=${imgTag}", "-p=CPU_LIMIT=${cpuLim}", "-p=MEM_LIMIT=${memLim}", "-p=CPU_REQUEST=${cpuReq}","-p=MEM_REQUEST=${memReq}",
+                  "-p=REPLICA_COUNT=${replicaCount}", "-p=DEPLOY_STRATEGY=${deployStrategy}")
+                created = openshift.create(modelAppYaml)
+                ansiColor('xterm') { echo "${ansiboldgreen}${created.out}${ansinormal}" }
+                updatesDone << "${openshift.project()} deploy objects for ${appName} : created"
+                // les objets secret et configmap sont a creer vides et ne sont pas dans les templates
+                echo openshift.raw('create', 'configmap',"${appName}-conf").out;
+                echo openshift.raw('label', 'cm', "${appName}-conf", "deploy=${appName}", "app=${appName}").out
+                echo openshift.raw('create', 'secret','generic',"${appName}-secret").out;
+                echo openshift.raw('label', 'secrets', "${appName}-secret", "deploy=${appName}", "app=${appName}").out
+                echo openshift.raw('secret', 'link', 'default', "${appName}-secret").out
+
+
+              }
+              else { // dc existe deja
+                println "${appName}: ${envName}: Checking deployment objects versus config..."
+
+                // image_tag :
+                dc_image = dc.object().spec.template.spec.containers[0].image
+                println "${appName}: ${envName}: DeploymentConfig current image = ${dc_image}"
+                s = commonOCP.splitImageTag(dc_image)   // [0]=imgfullname [1]=imgname [2]=tag 
+                currentDeployImage = s[0]; currentDeployTag = s[2]
+                commonOCP.updateIfNeeded('dc', 'image_tag', imgTag, currentDeployTag,
+                  '\'{"spec": {"template": {"spec": {"containers": [{"name": "'+appName+'","image": "'+currentDeployImage+imgTag+'"}]}}}}\'')
+
+                //cpu/memory_limit/request :
+                currentreq = dc.object().spec.template.spec.containers[0].resources.requests
+                if (currentreq != null) {
+                  currentCR = dc.object().spec.template.spec.containers[0].resources.requests.cpu
+                  currentMR = dc.object().spec.template.spec.containers[0].resources.requests.memory
+                }
+                else { currentCR = null; currentMR = null }
+                currentlim = dc.object().spec.template.spec.containers[0].resources.limits
+                if (currentlim != null) {
+                  currentCL = dc.object().spec.template.spec.containers[0].resources.limits.cpu
+                  currentML = dc.object().spec.template.spec.containers[0].resources.limits.memory
+                }
+                else { currentCL = null; currentML = null }
+                currentResources="CPUreq=${currentCR} CPUlim=${currentCL} MEMReq=${currentMR} MEMlim=${currentML}"
+                configResources="CPUreq=${cpuReq} CPUlim=${cpuLim} MEMReq=${memReq} MEMlim=${memLim}"
+                commonOCP.updateIfNeeded('dc', 'cpu&memory', configResources, currentResources,
+                  '\'{"spec": {"template": {"spec": {"containers": [{"name": "'+appName+'","resources": {"requests": {"cpu": "'+cpuReq+'", "memory": "'+memReq+'"}, "limits": {"cpu": "'+cpuLim+'", "memory": "'+memLim+'"}}}]}}}}\'')
+
+                // replica_count :
+                currentReplicaCount = dc.object().spec.replicas   // forcer ensuite des strings...
+                commonOCP.updateIfNeeded('dc', 'replica_count', "${replicaCount}", "${currentReplicaCount}", '\'{"spec": {"replicas": '+replicaCount+'}}\'')
+
+                // deploy_strategy :
+                currentDeployStrategy = dc.object().spec.strategy.type
+                commonOCP.updateIfNeeded('dc', 'deploy_strategy', deployStrategy, currentDeployStrategy,
+                  '\'{"spec": {"strategy": {"type": "'+deployStrategy+'"}}}\'')
+
+                // env_vars :
+                envVarP = ""
+                for (String envVar : env.env_vars) {
+                  envVarName = envVar.name
+                  envVarValue = envVar.value
+                  if (envVarValue == null) envVarValue = "";
+                  if (envVarName[-1] == "-") envVarP0 = envVarName;
+                  else envVarP0 = "${envVarName}=\"${envVarValue}\"";
+                  if (envVarP == "") envVarP = envVarP0;
+                  else envVarP = "${envVarP} ${envVarP0}";
+                } // for envVar
+                println "envvarP=${envVarP}"
+                if (envVarP != "") {
+                  refreshed = openshift.raw('set', 'env', "dc/${appName}", envVarP)
+                  ansiColor('xterm') { echo "${ansiboldgreen}${refreshed.out}${ansinormal}" }
+                  updatesDone << "${openshift.project()} refreshed env_vars for ${appName} : ${envVarP}"
+                }
+
+              }
+
+            } //withProject env
+
+          } //for env
+        } //stage
+
+        //oc adm policy add-role-to-user edit system:serviceaccount:azf-cicd:jenkins
+             
+      } //for applications
+    } //withCluster
+
+    currentBuild.result = 'SUCCESS'
+
+  }
+  catch(e) {
+    currentBuild.result = 'FAILURE'
+    throw e
+  }
+  finally {
+    if (updatesDone.size() > 0 || currentBuild.result == 'SUCCESS') {
+     ansiColor('xterm') {
+      println "${ansiboldgreen}UPDATES SUMMARY FOR THIS JOB :"
+      println "${ansiboldgreen}------------------------------------------------------------------------"
+      for (String update : updatesDone) {
+         println "${ansiboldgreen}${update}"
+      }
+      if (updatesDone.size() == 0) println "${ansiboldgreen}No update needed!"
+      println "${ansiboldgreen}------------------------------------------------------------------------${ansinormal}"
+     }
+    }
+  
+    wrap([$class: 'BuildUser']) { mailRecipients = "${BUILD_USER_EMAIL}" }
+    step([$class: 'Mailer', notifyEveryUnstableBuild: true, recipients: mailRecipients, sendToIndividuals: true])
+  }
+
+} //node()
+
