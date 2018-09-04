@@ -37,10 +37,9 @@ node('SlaveOCPT') {
 
         // NOTE : les fonctions commonOCP qui suivent generent les instructions "stage()" de la suite du pipeline
 
-        // Chargement des scripts communs OpenShift dans le sous-repertoire 'repoScripts' du Workspace
-        dir('repoScripts') { git url : 'http://bitbucket.agf.fr/scm/y6/y6-ocp-azf-scripts-groovy.git' }
-        def commonOCP = load("repoScripts/jenkinsfile-openshift-common-build")  // script de fonctions OCP
-
+        // Chargement des scripts communs OpenShift dans le sous-repertoire 'repoCommon' du Workspace
+        dir('repoCommon') { git url : 'http://bitbucket.agf.fr/scm/y6/y6-ocp-common.git' }
+        def commonOCP = load("repoCommon/groovy/jenkinsfile-openshift-common-build")  // script de fonctions OCP
 
         // Construit et tag une image de l'app dans OpenShift a partir du resultat du build maven
         commonOCP.buildApps(configFile,oneAppName)
