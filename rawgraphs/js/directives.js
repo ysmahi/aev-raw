@@ -141,8 +141,8 @@ angular.module('raw.directives', [])
 	        	if (!scope.chart || !scope.data.length) return;
 						if (!scope.model.isValid()) return;
 
-	        	d3.select(element[0])
-	        		.append("svg")
+            d3.select(element[0])
+              .append("svg")
 	        		.datum(scope.data)
 	        		.call(
 								scope.chart
@@ -374,11 +374,11 @@ angular.module('raw.directives', [])
 		     	scope.value = values();
 			  	scope.$apply();
 
-		     	element.parent().css("overflow","hidden");
+          element.parent().css("overflow","hidden");
 
-					var dimension = ui.item.data().dimension;
-		     	ui.item.toggleClass("invalid", !isValidType(dimension))
-		     	message();
+          var dimension = ui.item.data().dimension;
+          ui.item.toggleClass("invalid", !isValidType(dimension))
+          message();
 
 		     	$rootScope.$broadcast("update");
 		    }

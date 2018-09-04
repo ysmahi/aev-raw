@@ -5,14 +5,17 @@
   let dimColumnsRaw = model.dimension()
     .title('Name Columns')
     .types(String)
+    .required(1)
 
   let dimRowsRaw = model.dimension()
     .title('Name Rows')
     .types(String)
+    .required(1)
 
   let dimNameElements = model.dimension()
     .title('Name of Elements')
     .types(String)
+    .required(1)
 
   let dimColorElements = model.dimension()
     .title('Color of Elements')
@@ -20,9 +23,16 @@
 
   /* Map function */
   let nameDimensions = {}
+  let checkboxesColumnsDefined = false
+  let currentDimColumnName
+  let checkboxesColumnsName = [] // array containing the titles of the checkboxes, which are columns' name
+  let checkboxesColumns = [] // array containing the instances of checkboxes
+  let allColumns = []
 
   model.map(data => {
-    return data.map((el, i) => {
+    let columnsNameAlreadyDefined = false
+
+    let mapFunction =  data.map((el, i) => {
 
       if (i === 0) {
         nameDimensions = {
@@ -31,15 +41,55 @@
           nameDimRowsRaw: dimRowsRaw()[0], // ex: Réseau
           nameDimColorElements: (dimColorElements())?dimColorElements()[0]:false
         }
+
+        checkboxesColumnsDefined = (dimColumnsRaw()[0] === currentDimColumnName)
       }
 
-      return {
+      let elementData = {
         dimRow: el[dimRowsRaw()],
         dimColumn: el[dimColumnsRaw()],
         dimElementInside: el[dimNameElements()],
         dimColorElements: el[dimColorElements()]
       }
+
+      let columnHasNotBeenSeenAlready = checkboxesColumnsName.indexOf(el[dimColumnsRaw()]) === -1
+
+      if (columnHasNotBeenSeenAlready && !checkboxesColumnsDefined) checkboxesColumnsName.push(el[dimColumnsRaw()])
+
+      return elementData
     })
+
+    if (!checkboxesColumnsDefined) {
+      let diff = checkboxesColumns.length - checkboxesColumnsName.length
+
+      for (let indexCol = 0; indexCol < checkboxesColumnsName.length; indexCol++) {
+        let checkboxAlreadyCreated = (!!checkboxesColumns[indexCol])
+
+        if (checkboxAlreadyCreated) {
+          checkboxesColumns[indexCol]
+            .title(checkboxesColumnsName[indexCol])
+            .defaultValue(true)
+        }
+
+        else {
+          checkboxesColumns[indexCol] = chart.checkbox()
+            .title(checkboxesColumnsName[indexCol])
+            .defaultValue(true)
+        }
+      }
+
+      for (let indexCol = checkboxesColumns.length - diff; indexCol < checkboxesColumns.length; indexCol++) {
+          checkboxesColumns [indexCol].title('No title')
+            .defaultValue(true)
+      }
+
+      allColumns = checkboxesColumnsName
+
+      checkboxesColumnsName = []
+      currentDimColumnName = dimColumnsRaw()[0]
+    }
+
+    return mapFunction
   })
 
   /* Definition of chart options */
@@ -77,16 +127,25 @@
   }
 
   /* Drawing function */
-  chart.draw(function(selection, data) {
+  chart.draw(function(selection, dataRaw) {
     let dimColumn = 'dimColumn'
     let dimRow = 'dimRow'
     let dimElementInside = 'dimElementInside'
     let dimColorElements = 'dimColorElements'
     let nameDimRowRaw = nameDimensions.nameDimRowsRaw
     let nameDimColorElements = nameDimensions.nameDimColorElements
-    let columnsColors = ['#c0cff7', '#4170e7', '#00b0f0']
-    let onlySingleElements = (elementsDisposalManner() === 'Eléments courts')
+    let colorsPallet = ['#c0cff7', '#4170e7', '#00b0f0']
+    let directionElements = (elementsDisposalManner() === 'Eléments courts')
+    let checkboxesColumnsValues = checkboxesColumns.map(checkbox => checkbox())
+    let columnsName = allColumns.filter((col, indexColumn) => checkboxesColumnsValues[indexColumn])
 
+    let data = dataRaw.filter(el => {
+      let elHasAWantedColumn = columnsName.indexOf(el[dimColumn]) !== -1
+      if (elHasAWantedColumn) return el
+    })
+
+    // Create color domain
+    colors.domain(data, el => el[dimColorElements])
 
     let margin = {top: 5, right: 5, bottom: 5, left: 5},
       graphWidth =  +rawWidth() - 5,
@@ -103,9 +162,11 @@
 
     /* Retrieve data from dataset */
     // Create columns' and rows' name arrays
-    let columnsName = data.map(el => el[dimColumn]).filter((v, i, a) => a.indexOf(v) === i)
-    let colNamesPlusEmpty = data.map(el => el[dimColumn]).filter((v, i, a) => a.indexOf(v) === i)
-    colNamesPlusEmpty.unshift('')
+    let colNamesPlusEmpty = ['', ...columnsName]
+    let columnsColors = []
+    for (let col = 0; col < columnsName.length; col++) {
+      columnsColors.push(colorsPallet[col % colorsPallet.length])
+    }
     let rowsName = data.map(el => el[dimRow]).filter((v, i, a) => a.indexOf(v) === i)
 
     // Create dataset of elements that are on multiple dimensions
@@ -113,7 +174,7 @@
 
     // Separation of vertical, horizontal and single elements
     let verticalElementsData = [], horizontalElementsData = [], singleElementsData = []
-    if (!onlySingleElements) {
+    if (!directionElements) {
       // If we authorize big horizontal or vertical elements
       let separatedData = createMultiSingleData (data, dimRow, dimColumn, dimElementInside)
       verticalElementsData = separatedData[0]
@@ -126,7 +187,8 @@
         return {
           nameInsideElement: el[dimElementInside],
           columnName: el[dimColumn],
-          rowsName: rowsSingleElement
+          rowsName: rowsSingleElement,
+          dimColorElements: el[dimColorElements]
         }
       }))
 
@@ -143,7 +205,8 @@
         return {
           nameInsideElement: el[dimElementInside],
           columnsName: columnsSingleElement,
-          rowName: el[dimRow]
+          rowName: el[dimRow],
+          dimColorElements: el[dimColorElements]
         }
       })
 
@@ -320,7 +383,11 @@
       // Append name of rows and columns
       cell.append('text')
         .attr('x', cell => cell.x + cell.width/2)
-        .attr('y', cell => cell.y + cell.height/2)
+        .attr('y', (cell, indexCell) => {
+        let cellIsInFirstRow = (indexCell !== 0 && cell.hasOwnProperty('name'))
+        if (cellIsInFirstRow) return cell.y + 10
+        else return cell.y + cell.height/2
+      })
         .attr("dy", ".35em")
         .attr('text-anchor', 'middle')
         .attr('alignment-baseline', 'central')
@@ -333,6 +400,7 @@
         .style('fill', '#ffffff')
         .style('font-size', '13px')
         .style('font-family', 'Arial')
+        .call(wrap, cellWidth)
     }
 
     /* Calculate cell height depending on the maximum number of horizontal elements in a cell */
@@ -383,6 +451,8 @@
       let verticalElementsData = []
       let singleElementsData = dataElements.filter(el => namesDataMultiple.indexOf(el[nameDimElementInside]) === -1)
 
+      let colorElement = ''
+
       namesDataMultiple.forEach(nameInsideElement => {
         let rowsData = []
         let rows = []
@@ -390,6 +460,7 @@
           .forEach(el => {
             rows.push(el[nameDimRow])
             rowsData.push(el)
+            colorElement = (nameDimColorElements)?el[dimColorElements]:0.5
           })
 
         uniqueRowsName = rows.filter((v, i, a) => a.indexOf(v) === i)
@@ -418,7 +489,8 @@
                   horizontalElementsData.push({
                     nameInsideElement: nameInsideElement,
                     columnsName: cs,
-                    rowName: rowName
+                    rowName: rowName,
+                    dimColorElements: colorElement
                   })
                 }
                 else {
@@ -426,6 +498,7 @@
                   dataElement[nameDimElementInside] = nameInsideElement
                   dataElement[nameDimColumn] = cs[0]
                   dataElement[nameDimRow] = rowName
+                  dataElement[dimColorElements] = colorElement
                   singleElementsData.push(dataElement)
                 }
                 cs = [nameUniqueCols[l]]
@@ -434,6 +507,7 @@
                   dataElement[nameDimElementInside] = nameInsideElement
                   dataElement[nameDimColumn] = cs[0]
                   dataElement[nameDimRow] = rowName
+                  dataElement[dimColorElements] = colorElement
                   singleElementsData.push(dataElement)
                 }
               }
@@ -443,7 +517,8 @@
                   horizontalElementsData.push({
                     nameInsideElement: nameInsideElement,
                     columnsName: cs,
-                    rowName: rowName
+                    rowName: rowName,
+                    dimColorElements: colorElement
                   })
                 }
               }
@@ -469,7 +544,8 @@
                     verticalElementsData.push({
                       nameInsideElement: nameInsideElement,
                       columnName: nameCol,
-                      rowsName: rs
+                      rowsName: rs,
+                      dimColorElements: colorElement
                     })
                   }
                   else {
@@ -477,6 +553,7 @@
                     dataElement[nameDimElementInside] = nameInsideElement
                     dataElement[nameDimColumn] = nameCol
                     dataElement[nameDimRow] = rs[0]
+                    dataElement[dimColorElements] = colorElement
 
                     // Check if element already in singleElementsData
                     let stringSingElData = singleElementsData.map(el => JSON.stringify(el))
@@ -490,6 +567,7 @@
                     dataElement[nameDimElementInside] = nameInsideElement
                     dataElement[nameDimColumn] = nameCol
                     dataElement[nameDimRow] = rs[0]
+                    dataElement[dimColorElements] = colorElement
 
                     // Check if element already in singleElementsData
                     let stringSingElData = singleElementsData.map(el => JSON.stringify(el))
@@ -504,7 +582,8 @@
                     verticalElementsData.push({
                       nameInsideElement: nameInsideElement,
                       columnName: nameCol,
-                      rowsName: rs
+                      rowsName: rs,
+                      dimColorElements: colorElement
                     })
                   }
                 }
@@ -517,6 +596,7 @@
               dataElement[nameDimElementInside] = nameInsideElement
               dataElement[nameDimColumn] = nameCol
               dataElement[nameDimRow] = r[0]
+              dataElement[dimColorElements] = colorElement
               singleElementsData.push(dataElement)
             }
           }
@@ -582,7 +662,7 @@
           y: (elementIsVertical)?yBeginning + 5:yBeginning + marginYHorizontalElements,
           size: [widthElement, heightElement],
           nameInsideElement: (elementIsSingle)?element[dimElementInside]:element.nameInsideElement,
-          colorElement: '#426bb0'
+          colorElement: nameDimColorElements ? colors()(element[dimColorElements]) : '#426bb0'
         }
 
         if (elementIsVertical) {
@@ -760,5 +840,30 @@
     function getSelectionCellData (idCell) {
       return d3.selectAll('.Row').selectAll('.Cell').select(idCell).datum()
     }
+
+    function wrap(text, width) {
+    text.each(function() {
+      var text = d3.select(this),
+        words = text.text().split(/\s+/).reverse(),
+        word,
+        line = [],
+        lineNumber = 0,
+        lineHeight = 1.1, // ems
+        y = text.attr("y"),
+        x = text.attr('x'),
+        dy = parseFloat(text.attr("dy")),
+        tspan = text.text(null).append("tspan").attr("x", x).attr("y", y).attr("dy", dy + "em");
+      while (word = words.pop()) {
+        line.push(word);
+        tspan.text(line.join(" "));
+        if (tspan.node().getComputedTextLength() > width) {
+          line.pop();
+          tspan.text(line.join(" "));
+          line = [word];
+          tspan = text.append("tspan").attr("x", x).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
+        }
+      }
+    });
+  }
   })
 })();

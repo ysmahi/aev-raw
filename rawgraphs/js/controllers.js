@@ -4,7 +4,7 @@
 
 angular.module('raw.controllers', [])
 
-  .controller('RawCtrl', function ($scope, dataService, $http, $timeout, $sce) {
+  .controller('RawCtrl', function ($scope, $rootScope, dataService, $http, $timeout, $sce) {
 
     $scope.loading = false;
 
@@ -95,6 +95,12 @@ angular.module('raw.controllers', [])
       }
     };
 
+    // Refresh the chart
+    $scope.refreshChart = () => {
+      $scope.uploadFile($scope.files);
+      // TODO : scope.data inchangé dans directives.js
+      $rootScope.$broadcast("update")
+    }
 
     function parseData(json){
 
