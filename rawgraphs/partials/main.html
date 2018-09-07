@@ -227,7 +227,34 @@
 							</div>
 						</div>
 
+						<h4>AE Charts</h4>
+
 						<div class="col-lg-9 col-md-8">
+							<div class="row">
+								<div class="col-lg-3 col-md-4 col-sm-4 col-xs-6" ng-repeat="c in aevCharts">
+									<div ng-class="{selected: c == chart}" class="layout"  ng-click="selectChart(c)">
+										<div class="layout-thumb" ng-style="{'background-image':'url(' + c.thumbnail() + ')'}"></div>
+										<p class="layout-inner" >
+											<span class="layout-title">{{c.title()}}</span>
+											<span class="text-muted layout-category">{{c.category() || 'Other'}}</span>
+										</p>
+										<div class="layout-check">
+											<i class="fa fa-check"></i>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<button class="btn btn-primary btn-lg btn-block" id="rawGraphsBtn" type="button" data-toggle="collapse" data-target="#rawCharts" 
+					aria-expanded="false" aria-controls="rawCharts" ng-click="changeActiveBtnStatus()">
+							RAWGraphs charts
+					</button>
+
+					<div class="collapse" id="rawCharts">
+						<div class="row">
+							<div class="col-lg-9 col-md-8">
 								<div class="row">
 									<div class="col-lg-3 col-md-4 col-sm-4 col-xs-6" ng-repeat="c in charts">
 										<div ng-class="{selected: c == chart}" class="layout"  ng-click="selectChart(c)">
@@ -237,8 +264,8 @@
 												<span class="text-muted layout-category">{{c.category() || 'Other'}}</span>
 											</p>
 											<div class="layout-check">
-													<i class="fa fa-check"></i>
-												</div>
+												<i class="fa fa-check"></i>
+											</div>
 										</div>
 									</div>
 
@@ -255,17 +282,11 @@
 												</p>
 											</div>
 										</a>
-
-								</div><!-- end of group -->
-
+									</div><!-- end of group -->
+								</div>
 							</div>
-
-
-
 						</div>
-
 					</div>
-
 
 				</div>
 

@@ -97,6 +97,7 @@
   chart.model(model)
   chart.title('Couverture de domaines')
     .description('Couverture de capacités ou de domaines par des Services Applicatifs (SA)')
+    .chartSource('aev')
 
   let rawWidth = chart.number()
     .title('Largeur')

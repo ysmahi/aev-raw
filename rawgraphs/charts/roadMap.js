@@ -105,6 +105,8 @@
   chart.model(model)
   chart.title('Road Map')
     .description('Simple Road Map')
+    .thumbnail("imgs/roadmap.png")
+    .chartSource('aev')
 
   let displayFirstColumn = chart.checkbox()
     .title("Display First Column")

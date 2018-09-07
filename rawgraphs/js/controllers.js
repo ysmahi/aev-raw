@@ -397,7 +397,14 @@ angular.module('raw.controllers', [])
 
         $timeout(function() {
           $scope.charts = raw.charts.values().sort(function (a,b){ return d3.ascending(a.category(),b.category()) || d3.ascending(a.title(),b.title()) })
-          $scope.chart = $scope.charts.filter(d => {return d.title() == 'Scatter Plot'})[0];
+            .filter(chart => chart.chartSource() === 'raw')
+          $scope.aevCharts = raw.charts.values().filter(chart => chart.chartSource() === 'aev')
+          .sort((a, b) => {
+            if(a.title() < b.title()) return -1;
+            if(a.title() > b.title()) return 1;
+            return 0;
+          })
+          $scope.chart = $scope.aevCharts.filter(d => {return d.title() == 'Road Map'})[0];
           $scope.model = $scope.chart ? $scope.chart.model() : null;
         });
       } catch(e){
@@ -450,6 +457,10 @@ angular.module('raw.controllers', [])
       $scope.model.clear();
       $scope.chart = chart;
       $scope.model = $scope.chart.model();
+    }
+
+    $scope.changeActiveBtnStatus = () => {
+      $('#rawGraphsBtn').toggleClass('active');
     }
 
     function refreshScroll(){

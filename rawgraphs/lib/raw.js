@@ -711,6 +711,7 @@
   var chart_option = function() {
 
     var title = 'Untitled',
+        chartSource = 'raw',
         description, defaultValue;
 
     var option = function(){
@@ -732,6 +733,12 @@
     option.description = function(_) {
       if (!arguments.length) return description;
       description = _ + "";
+      return option;
+    }
+
+    option.chartSource = function (_) {
+      if (!arguments.length) return chartSource;
+      chartSource = _ + "";
       return option;
     }
 
@@ -829,6 +836,7 @@
     var id = id || raw.charts.values().length,
         title = "Untitled",
         description = null,
+        chartSource = "raw",
         category = null,
         thumbnail = "",
 				isDrawing = false,
@@ -858,6 +866,12 @@
     chart.description = function(_) {
       if (!arguments.length) return description;
       description = _.toString();
+      return chart;
+    }
+
+    chart.chartSource = function(_) {
+      if (!arguments.length) return chartSource;
+      chartSource = _.toString();
       return chart;
     }
 

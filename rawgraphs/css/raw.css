@@ -1242,3 +1242,28 @@ pre.CodeMirror-placeholder {
 @media (min-width: @screen-lg-min) {
 
 }
+
+#rawGraphsBtn:before {
+  font-family: 'Glyphicons Halflings';
+  content: "\e114";
+  float: right;
+  transition: all 0.5s;
+  background-color: #0dc4a3;
+  color: #ffffff;
+}
+
+#rawGraphsBtn {
+  background-color: #0dc4a3;
+  color: #ffffff;
+  opacity: 0.85;
+}
+
+#rawGraphsBtn:hover {
+  opacity: 1;
+}
+
+#rawGraphsBtn.active:before {
+ -webkit-transform: rotate(180deg);
+ -moz-transform: rotate(180deg);
+ transform: rotate(180deg);
+}

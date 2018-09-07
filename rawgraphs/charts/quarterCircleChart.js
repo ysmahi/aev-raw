@@ -57,6 +57,7 @@
   chart.model(model)
   chart.title('Quarter Circle Chart')
     .description('Quarter circle scatter plot')
+    .chartSource('aev')
 
   let rawWidth = chart.number()
     .title('Width')
