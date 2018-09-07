@@ -50,16 +50,16 @@
 
   raw.parser = function(delimiter) {
 
-    // Insiperd by Ben Nadel's algorithm
-    // http://www.bennadel.com/blog/1504-ask-ben-parsing-csv-strings-with-javascript-exec-regular-expression-command.htm
-    function parser(string) {
-      if (!string || string.length === 0) return [];
+            // Insiperd by Ben Nadel's algorithm
+            // http://www.bennadel.com/blog/1504-ask-ben-parsing-csv-strings-with-javascript-exec-regular-expression-command.htm
+            function parser(string) {
+              if (!string || string.length === 0) return [];
 
-      var delimiter = parser.delimiter || detectDelimiter(string),
-          rows = [[]],
-          match, matches,
-          data = [],
-          re = new RegExp((
+              var delimiter = parser.delimiter || detectDelimiter(string),
+                rows = [[]],
+                match, matches,
+                data = [],
+                re = new RegExp((
               "(\\" + delimiter + "|\\r?\\n|\\r|^)" +
               "(?:\"([^\"]*(?:\"\"[^\"]*)*)\"|" +
               "([^\"\\" + delimiter + "\\r\\n]*))"
@@ -72,13 +72,22 @@
         rows[rows.length - 1].push( match );
       }
 
-      var header = rows[0];
+      var headerIndex = 0;
+      var header = rows[headerIndex];
 
-      for (var i=1; i<rows.length; i++) {
-        if (rows[i].length == 1 && rows[i][0].length == 0 && rows[i].length != header.length) continue;
-        if(rows[i].length == header.length) {
+      // Check if header is first line and if not try with following lines (until fifth line)
+      while (emptyStrings(header) > 2 && headerIndex < 5) {
+        headerIndex++;
+        header = rows[headerIndex];
+      }
+
+      for (var i = headerIndex + 1; i < rows.length; i++) {
+        if (rows[i].length == 1 && rows[i][0].length == 0 && rows[i].length != header.length) {
+          continue;
+        }
+        if (rows[i].length == header.length) {
           var obj = {};
-          for (var h in header){
+          for (var h in header) {
             obj[header[h]] = rows[i][h];
           }
           data.push(obj);
@@ -88,6 +97,15 @@
         }
       }
       return data;
+    }
+
+    // Returns number of empty strings in an array
+    function emptyStrings (array) {
+      var numberEmptyStrings = 0;
+      for (var i = 0; i < array.length; i++) {
+        if (array[i] === '') numberEmptyStrings++;
+      }
+      return numberEmptyStrings;
     }
 
     function mode(array) {
@@ -965,19 +983,19 @@
   ]
 
   raw.isString = function(value){
-    return typeof value == 'string';
-  }
+            return typeof value == 'string';
+          }
 
-  raw.isNumber = function(value) {
-    return !isNaN(value);
-  }
+          raw.isNumber = function(value) {
+            return !isNaN(value);
+          }
 
-  raw.isDate = function(value){
-    var isDate = false;
-    for (var format in raw.dateFormats){
-      if (value.trim().match(raw.dateFormats[format])) {
-				isDate = !isNaN(Date.parse(value)) && value.length != 4;
-        if (isDate){
+        raw.isDate = function(value){
+          var isDate = false;
+          for (var format in raw.dateFormats){
+            if (value.trim().match(raw.dateFormats[format])) {
+              isDate = !isNaN(Date.parse(value)) && value.length != 4;
+              if (isDate){
 						break;
 				}
       }

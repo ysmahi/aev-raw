@@ -423,6 +423,13 @@
 			</ul>
 		</div>
 
+        <button class="btn btn-default btn-lg" type="button" id="refresh"
+				ng-click="refreshChart()">
+            <!--http://glyphicons.com/-->
+            <span class="glyphicon glyphicon-refresh" aria-hidden="true"></span>
+            Refresh chart
+        </button>
+
 		<div class="col-lg-9">
 			<div class="chart-resize">
 				<div ng-show="model.isValid()" id="chart" chart></div>
