@@ -1,7 +1,7 @@
 #!/usr/bin/env groovy
 
 // Utiliser un node Linux et pas Windows...
-node('SlaveOCPT') {
+node('SlaveOCP1') {
     
     String configFile = 'openshift-config.yaml'   // YAML contient tous les parametres pour objets de l'application dans OpenShift
 
