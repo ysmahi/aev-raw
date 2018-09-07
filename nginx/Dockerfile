@@ -21,7 +21,7 @@ RUN VERSION="8.11.3" SHACMD=sha256sum SHA=1ea408e9a467ed4571730e160993f67a100e8c
     TARGETD=/usr/share/node-${VERSION} \
     ./download_zip_file.sh 
 
-RUN VERSION="8.11.3" PATH=$PATH:/usr/share/node-${VERSION}/bin npm install -g bower
+RUN VERSION="8.11.3" PATH=$PATH:/usr/share/node-${VERSION}/bin npm install -g yarn
 
 # Force log dans stdout/err plutot que fichier
 RUN ln -sf /dev/stdout /var/opt/rh/rh-nginx112/log/nginx/access.log \
@@ -36,7 +36,7 @@ STOPSIGNAL SIGTERM
 
 USER 1001
 
-RUN VERSION="8.11.3" PATH=$PATH:/usr/share/node-${VERSION}/bin bower install 
+RUN VERSION="8.11.3" PATH=$PATH:/usr/share/node-${VERSION}/bin yarn install 
 
 
 CMD $STI_SCRIPTS_PATH/run
