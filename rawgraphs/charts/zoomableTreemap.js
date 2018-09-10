@@ -9,6 +9,7 @@
     .thumbnail("/raw/imgs/treemap.png")
     .category('Hierarchies')
     .model(tree)
+    .chartSource('aev')
 
   let rawWidth = chart.number()
     .title('Width')
