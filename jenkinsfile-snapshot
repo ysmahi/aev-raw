@@ -39,7 +39,7 @@ node('SlaveOCP1') {
 
         // Chargement des scripts communs OpenShift dans le sous-repertoire 'repoCommon' du Workspace
         dir('repoCommon') { git url : 'http://bitbucket.agf.fr/scm/y6/y6-ocp-common.git' }
-        def commonOCP = load("repoCommon/groovy/jenkinsfile-openshift-common-build")  // script de fonctions OCP
+        def commonOCP = load("repoCommon/groovy/jenkinsfile-openshift-lib-build")  // script de fonctions OCP
 
         // Construit et tag une image de l'app dans OpenShift a partir du resultat du build maven
         commonOCP.buildApps(configFile,oneAppName)

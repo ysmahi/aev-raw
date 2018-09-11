@@ -12,8 +12,9 @@ RUN chmod 755 ./download_zip_file.sh
 #  &&  yum-config-manager --enable rhel-server-rhscl-8-rpms \
 #  &&  yum-config-manager --enable rhel-7-server-optional-rpms \
 #  &&  yum-config-manager --disable epel >/dev/null || : \
-RUN  yum install -y git \
-  &&  yum clean all -y
+
+#RUN  yum install -y git \
+#  &&  yum clean all -y
 
 # Installe un ou des nodeJS
 RUN VERSION="8.11.3" SHACMD=sha256sum SHA=1ea408e9a467ed4571730e160993f67a100e8c347f6f9891c9a83350df2bf2be \
