@@ -230,7 +230,9 @@
     // Cell and element width
     let marginBetweenColumns = 3
     let marginBetweenRowsOfFirstColumn = 5
-    let cellWidth = graphWidth / (columnsName.length + 1) - (columnsName.length - 1) * marginBetweenColumns
+    let coefWidthFirstColumn = 0.75
+    let cellWidth = graphWidth / (columnsName.length + coefWidthFirstColumn) - (columnsName.length - 1) * marginBetweenColumns
+    let widthFirstColumn = coefWidthFirstColumn * cellWidth
     let cellHeight = graphHeight / (rowsName.length + 1)
     let verticalElementsWidth = cellWidth / (maxVerticalElements + 1)
     let horizontalElementsHeight = cellHeight / (maxHorizontalElements + 1)
@@ -273,8 +275,8 @@
       let data = [];
       let xpos = 1; //starting xpos and ypos at 1 so the stroke will show when we make the grid below
       let ypos = 1;
-      let width = cellWidth;
       let height = cellHeight;
+      let width
 
       // iterate for rows
       for (let row = 0; row < numberRow; row++) {
@@ -282,6 +284,7 @@
 
         // iterate for cells/columns inside rows
         for (let column = 0; column < numberColumn; column++) {
+          width = (column === 0) ? widthFirstColumn : cellWidth 
           data[row].push({
             x: xpos,
             y: ypos,
@@ -302,6 +305,7 @@
     function drawGrid (parentSelection, gridData) {
       parentSelection.append('g')
         .attr('id', 'grid')
+        .attr('transform', 'translate(' + margin.left + ', 0)')
 
       let grid = d3.select('#grid')
         .append('svg')
@@ -401,7 +405,7 @@
         .style('fill', '#ffffff')
         .style('font-size', '13px')
         .style('font-family', 'Arial')
-        .call(wrap, cellWidth)
+        .call(wrap) // Breakline when text too long
 
     // Append lines that separate rows
     let separatingLines = grid.append('g')
@@ -897,8 +901,9 @@
       return d3.selectAll('.Row').selectAll('.Cell').select(idCell).datum()
     }
 
-    function wrap(text, width) {
+    function wrap(text) {
     text.each(function() {
+      let rectParent = d3.select(this.parentNode).select('rect')
       var text = d3.select(this),
         words = text.text().split(/\s+/).reverse(),
         word,
@@ -912,12 +917,19 @@
       while (word = words.pop()) {
         line.push(word);
         tspan.text(line.join(" "));
-        if (tspan.node().getComputedTextLength() > width) {
+        if (tspan.node().getComputedTextLength() > rectParent.attr('width') - 3) {
           line.pop();
           tspan.text(line.join(" "));
           line = [word];
           tspan = text.append("tspan").attr("x", x).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
         }
+      }
+
+      let centeredText = (rectParent.attr('class') === 'rowNameRect')
+
+      if (centeredText) {
+        let yTranslation = (lineNumber * 16) / 2 // 16 is because 1em = 16px
+        text.attr('transform', 'translate(0, -' + yTranslation + ')')
       }
     });
   }
