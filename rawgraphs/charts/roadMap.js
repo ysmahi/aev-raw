@@ -282,6 +282,7 @@
     // function that creates a grid
     // http://www.cagrimmett.com/til/2016/08/17/d3-lets-make-a-grid.html
     function createGridData (numberRow, numberColumn, cellWidth, arrayMaxElementPerRow, elementHeight, firstRowHeight, firstColumnWidth) {
+      
       let dataPos = [];
       let xpos = 1; //starting xpos and ypos at 1 so the stroke will show when we make the grid below
       let ypos = 1;
@@ -424,13 +425,13 @@
           if (rowIndex === 0) {
             // Cell is column name
             nameColor = '#49648c'
-            rowIndex = (indexCell === columnsName.length  )?(rowIndex + 1):rowIndex
+            rowIndex = (indexCell === columnsName.length)?(rowIndex + 1):rowIndex
           }
           return nameColor
         })
         .style('font-family', 'Arial')
         .style('font-size', '11px')
-        .call(wrap, cellWidth)
+        .call(wrap)
 
       // Draw lines that separate columns
       let separatingLine = grid.append('g')
@@ -499,7 +500,7 @@
         .style('font-family', 'Arial')
         .style('font-size', '11px')
         .style('font-weight', 'bold')
-        .call(wrap, cellWidth)
+        .call(wrap)
 
       firstColumn.append('rect')
         .attr('x', 1)
@@ -523,7 +524,7 @@
         .style('font-weight', 'bold')
         .style('font-family', 'Arial')
         .style('font-size', '11px')
-        .call(wrap, cellWidth)
+        .call(wrap)
 
       // Append totals
       for (let year = 0; year < columnsName.length; year++) {
@@ -1005,17 +1006,16 @@
       return 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')';
     }
 
-    function wrap(text, width) {
+    function wrap(text) {
       text.each(function() {
-        let parentNode = d3.select(this.parentNode).select('rect')
+        let rectParent = d3.select(this.parentNode).select('rect')
         let text = d3.select(this),
-          maxWidth = width ? width : parentNode.attr('width') - 3,
           words = text.text().split(/\s+/).reverse(),
           word,
           line = [],
           lineNumber = 0,
           lineHeight = 1.1, // ems
-          y = text.attr("y"),
+          y = text.attr('y'),
           x = text.attr('x'),
           dy = parseFloat(text.attr("dy")),
           tspan = text.text(null).append("tspan").attr("x", x).attr("y", y).attr("dy", dy + "em")
@@ -1023,7 +1023,7 @@
         while (word = words.pop()) {
           line.push(word);
           tspan.text(line.join(" "));
-          if (tspan.node().getComputedTextLength() > parentNode.attr('width') - 3) {
+          if (tspan.node().getComputedTextLength() > rectParent.attr('width') - 3) {
             line.pop();
             tspan.text(line.join(" "));
             line = [word];

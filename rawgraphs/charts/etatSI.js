@@ -101,7 +101,7 @@
 
   let rawWidth = chart.number()
     .title('Largeur')
-    .defaultValue(900)
+    .defaultValue(700)
 
   let rawHeight = chart.number()
     .title('Hauteur')
@@ -139,6 +139,7 @@
     let directionElements = (elementsDisposalManner() === 'Eléments courts')
     let checkboxesColumnsValues = checkboxesColumns.map(checkbox => checkbox())
     let columnsName = allColumns.filter((col, indexColumn) => checkboxesColumnsValues[indexColumn])
+    let colorDimensionDefined = (nameDimColorElements)
 
     let data = dataRaw.filter(el => {
       let elHasAWantedColumn = columnsName.indexOf(el[dimColumn]) !== -1
@@ -230,8 +231,13 @@
     // Cell and element width
     let marginBetweenColumns = 3
     let marginBetweenRowsOfFirstColumn = 5
-    let cellWidth = graphWidth / (columnsName.length + 1) - (columnsName.length - 1) * marginBetweenColumns
-    let cellHeight = graphHeight / (rowsName.length + 1)
+    let coefWidthFirstColumn = 0.75
+    let cellWidth = graphWidth / (columnsName.length + coefWidthFirstColumn) - (columnsName.length - 1) * marginBetweenColumns
+    let widthFirstColumn = coefWidthFirstColumn * cellWidth
+    let legendHeight = 22
+    let cellHeight = (colorDimensionDefined) ?
+    (graphHeight - legendHeight) / (rowsName.length + 1) :
+    graphHeight / (rowsName.length + 1)
     let verticalElementsWidth = cellWidth / (maxVerticalElements + 1)
     let horizontalElementsHeight = cellHeight / (maxHorizontalElements + 1)
     let marginXVerticalElements = (cellWidth - maxVerticalElements * verticalElementsWidth) / (1 + maxVerticalElements)
@@ -260,6 +266,7 @@
 
     /* Creation of the underneath grid */
     drawGrid(divGridGraph, gridData)
+    if (colorDimensionDefined) drawColorLegend()
 
     /* Create superimposed svg elements */
     // Drawing of vertical and horizontal elements
@@ -273,8 +280,8 @@
       let data = [];
       let xpos = 1; //starting xpos and ypos at 1 so the stroke will show when we make the grid below
       let ypos = 1;
-      let width = cellWidth;
       let height = cellHeight;
+      let width
 
       // iterate for rows
       for (let row = 0; row < numberRow; row++) {
@@ -282,6 +289,7 @@
 
         // iterate for cells/columns inside rows
         for (let column = 0; column < numberColumn; column++) {
+          width = (column === 0) ? widthFirstColumn : cellWidth 
           data[row].push({
             x: xpos,
             y: ypos,
@@ -302,6 +310,7 @@
     function drawGrid (parentSelection, gridData) {
       parentSelection.append('g')
         .attr('id', 'grid')
+        .attr('transform', 'translate(' + margin.left + ', 0)')
 
       let grid = d3.select('#grid')
         .append('svg')
@@ -401,7 +410,7 @@
         .style('fill', '#ffffff')
         .style('font-size', '13px')
         .style('font-family', 'Arial')
-        .call(wrap, cellWidth)
+        .call(wrap) // Breakline when text too long
 
     // Append lines that separate rows
     let separatingLines = grid.append('g')
@@ -457,7 +466,57 @@
 
     }
 
+    /* Draw color legend */
+    function drawColorLegend () {
+      let colorLegendG = d3.select('.gridGraph')
+      .append('g')
+      .attr('class', 'colorLegend')
 
+      colorLegendG.append('text')
+      .attr('x', 0)
+      .attr('y', legendHeight / 2)
+      .attr('dy', '.3em')
+      .text('Légende')
+      .style('font-family', 'Arial')
+      .style('font-size', '10px')
+
+      let widthLegendRect = 0.70 * cellWidth
+      let heightLegendRect = legendHeight - 2
+      let spaceBetweenRect = 10
+      // Unique values in the color domain
+      let uniqueColorsValues = colors.domain().filter((v, i, a) => a.indexOf(v) === i)
+
+      // Create all colored rectangles for legend
+      for (let indexColor=0; indexColor<uniqueColorsValues.length; indexColor++) {
+        console.log('colorDoman', colors.domain())
+        colorLegendG.append('rect')
+        .attr('x', 50 + indexColor * (widthLegendRect + spaceBetweenRect))
+        .attr('y', 0)
+        .attr('rx', 4)
+        .attr('ry', 4)
+        .attr('width', widthLegendRect)
+        .attr('height', heightLegendRect)
+        .style('fill', colors()(uniqueColorsValues[indexColor]))
+        .style('stroke', 'black')
+        .style('stroke-width', '2')
+
+        colorLegendG.append('text')
+        .text(uniqueColorsValues[indexColor])
+        .attr('x', 50 + indexColor * (widthLegendRect + spaceBetweenRect) + widthLegendRect / 2)
+        .attr('y', legendHeight / 2)
+        .attr('dy', '0')
+        .attr('text-anchor', 'middle')
+        .attr('alignment-baseline', 'central')
+        .style('fill', '#ffffff')
+        .style('font-family', 'Arial')
+        .style('font-weight', 'bold')
+        .style('font-size', '12px')
+      }
+
+      // Translate the whole legend horizontally
+      let yTranslate = graphHeight - legendHeight + 5
+      colorLegendG.attr('transform', 'translate(' + 0.75 * cellWidth + ',' + yTranslate + ')')
+    }
 
     /* Calculate cell height depending on the maximum number of horizontal elements in a cell */
     function getMaxHorizontalElements (horizontalElementsData, rowsName, columnsName) {
@@ -897,8 +956,9 @@
       return d3.selectAll('.Row').selectAll('.Cell').select(idCell).datum()
     }
 
-    function wrap(text, width) {
+    function wrap(text) {
     text.each(function() {
+      let rectParent = d3.select(this.parentNode).select('rect')
       var text = d3.select(this),
         words = text.text().split(/\s+/).reverse(),
         word,
@@ -912,12 +972,19 @@
       while (word = words.pop()) {
         line.push(word);
         tspan.text(line.join(" "));
-        if (tspan.node().getComputedTextLength() > width) {
+        if (tspan.node().getComputedTextLength() > rectParent.attr('width') - 3) {
           line.pop();
           tspan.text(line.join(" "));
           line = [word];
           tspan = text.append("tspan").attr("x", x).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
         }
+      }
+
+      let centeredText = (rectParent.attr('class') === 'rowNameRect')
+
+      if (centeredText) {
+        let yTranslation = (lineNumber * 16) / 2 // 16 is because 1em = 16px
+        text.attr('transform', 'translate(0, -' + yTranslation + ')')
       }
     });
   }
