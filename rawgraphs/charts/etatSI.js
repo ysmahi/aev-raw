@@ -402,7 +402,62 @@
         .style('font-size', '13px')
         .style('font-family', 'Arial')
         .call(wrap, cellWidth)
+
+    // Append lines that separate rows
+    let separatingLines = grid.append('g')
+    .attr('class', 'separatingLinesG')
+    .selectAll('separatingLine')
+    .data(gridData)
+    .enter()
+    .append('path')
+    .attr('class', 'separatingLine')
+    .attr('d',(row, indexRow, allRows) => {
+      let firstCellOfRow = row[0]
+      let lastCellOfRow = row[row.length - 1]
+      let lastRow = (indexRow === allRows.length - 1)
+
+      let leftLineX = firstCellOfRow.x // 0.7 is to make disappear white line between rect and arrow
+      let leftLineY = lastRow ? firstCellOfRow.y + cellHeight - 1.5 : firstCellOfRow.y + cellHeight
+      let rightLineX = lastCellOfRow.x + cellWidth
+      let rightLineY = leftLineY
+      return 'M' + leftLineX + ' ' + leftLineY //Upper point of line
+        + ' L' + rightLineX + ' ' + rightLineY // Bottom point of line
+        + ' Z' // Close path
+
+    })
+    .style('stroke', "#000")
+    .style('stroke-width', '0.3px')
+    .style('stroke-dasharray', (line, index, allLines) => {
+        if (index === 0 || index === allLines.length -1) return "0.4%, 0.3%"
+      })
+
+      // Append vertical lines at the left and right of the chart
+      let bottomLineY = gridData[gridData.length - 1][0].y + cellHeight
+      let pathFirstLine = 'M' + gridData[1][0].x + ' ' + gridData[1][0].y
+      + ' L' + gridData[1][0].x + ' ' + bottomLineY // Bottom point of line
+      + ' Z' // Close path
+      let lastLineX = gridData[1][gridData[1].length - 1].x + cellWidth
+      let pathLastLine = 'M' + lastLineX + ' ' + gridData[1][gridData[1].length - 1].y
+      + ' L' + lastLineX + ' ' + bottomLineY // Bottom point of line
+      + ' Z' // Close path
+
+      grid.select('.separatingLinesG')
+      .append('path')
+      .attr('d', pathFirstLine)
+    .style('stroke', "#000")
+    .style('stroke-width', '0.3px')
+    .style('stroke-dasharray', "0.4%, 0.3%")
+
+    grid.select('.separatingLinesG')
+      .append('path')
+      .attr('d', pathLastLine)
+    .style('stroke', "#000")
+    .style('stroke-width', '0.3px')
+    .style('stroke-dasharray', "0.4%, 0.3%")
+
     }
+
+
 
     /* Calculate cell height depending on the maximum number of horizontal elements in a cell */
     function getMaxHorizontalElements (horizontalElementsData, rowsName, columnsName) {
