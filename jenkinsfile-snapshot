@@ -16,22 +16,22 @@ node('SlaveOCP1') {
             checkout scm
         }
 
-        //stage("Build Maven") {
-        //    wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'xterm']) {
-        //        def common = load("${pwd()}/jenkinsfile-common")
-        //        timestamps { common.mavenTask("clean deploy") }  // -Dmaven.test.failure.ignore=true
-        //    }
-        //}
-
-        stage("Build sans Maven") {
+        stage("Build Maven") {
             wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'xterm']) {
-              myapp = 'nginx'
-              sh(script: "rm -rf package")
-              sh(script: "mkdir -p package/${myapp}")
-              sh(script: "cp -prv rawgraphs/* package/${myapp}")
-              sh(script: "cp -prv nginx/* package/${myapp}")
+                def common = load("${pwd()}/jenkinsfile-common")
+                timestamps { common.mavenTask("clean deploy") }  // -Dmaven.test.failure.ignore=true
             }
         }
+
+        //stage("Build sans Maven") {
+        //    wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'xterm']) {
+        //      myapp = 'nginx'
+        //      sh(script: "rm -rf package")
+        //      sh(script: "mkdir -p package/${myapp}")
+        //      sh(script: "cp -prv rawgraphs/* package/${myapp}")
+        //      sh(script: "cp -prv nginx/* package/${myapp}")
+        //    }
+        //}
 
        
 

@@ -1,0 +1,16 @@
+#!/usr/bin/env groovy
+
+println("load file common")
+def mavenTask(String command) {
+    println("mavenTask execution command")
+    def MAVEN_BUILD=tool 'Maven_3.5.2'
+
+    if (isUnix()) {
+        println("execute command line with sh")
+        sh "'${MAVEN_BUILD}/bin/mvn' -U -B  ${command}"
+    } else {
+        println("execute command line with bat")
+    }
+}
+
+return this

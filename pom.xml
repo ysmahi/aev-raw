@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>fr.allianz.y6.rawgraphs</groupId>
+    <artifactId>y6-rawgraphs</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+
+    <!-- Modules -->
+    <modules>
+        <module>nginx</module>
+        <module>rawgraphs</module>
+        <module>package</module>
+    </modules>
+
+    <!-- Proprietes -->
+    <properties>
+        <java.version>1.8</java.version>
+        <!--maven.compiler.source>${java.version}</maven.compiler.source-->
+        <!--maven.compiler.target>${java.version}</maven.compiler.target-->
+        <maven.release.plugin-version>2.5.3</maven.release.plugin-version>
+        <!--org.projectlombok-version>1.16.6</org.projectlombok-version-->
+        <!--com.google.guava-version>23.3-jre</com.google.guava-version-->
+        <!--commons.lang3-version>3.7</commons.lang3-version-->
+        <!--tomcat.embedded.version>8.5.15</tomcat.embedded.version-->
+    </properties>
+
+    <!--heritage parent -->
+    <!--parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>1.5.15.RELEASE</version>
+    </parent-->
+
+
+    <!-- 5. SCM : Source Code Manager -->
+    <scm>
+        <connection>scm:git:http://bitbucket.agf.fr/scm/y6/y6-rawgraphs.git</connection>
+        <developerConnection>scm:git:http://bitbucket.agf.fr/scm/y6/y6-rawgraphs.git</developerConnection>
+        <url>scm:git:http://bitbucket.agf.fr/scm/y6/y6-rawgraphs.git</url>
+        <tag>HEAD</tag>
+    </scm>
+
+    <!-- 6. Gestion des repositories Nexus Snaphsot & Release -->
+    <distributionManagement>
+        <repository>
+            <id>releases</id>
+            <name>Nexus Releases</name>
+            <url>http://srvnexus.agf.fr/nexus/content/repositories/releases</url>
+        </repository>
+        <snapshotRepository>
+            <id>snapshots</id>
+            <name>Nexus Snapshots</name>
+            <url>http://srvnexus.agf.fr/nexus/content/repositories/snapshots</url>
+        </snapshotRepository>
+    </distributionManagement>
+
+
+    <!-- dependance managment -->
+    <dependencyManagement>
+        <dependencies>
+            <!-- dependances projet -->
+            <dependency>
+                <groupId>fr.allianz.y6.rawgraphs</groupId>
+                <artifactId>y6-rawgraphs-nginx</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>fr.allianz.y6.rawgraphs</groupId>
+                <artifactId>y6-rawgraphs-rawgraphs</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <!-- Ecrasement config build pour maven release-->
+    <build>
+        <plugins>
+            <!--plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin-->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-release-plugin</artifactId>
+                <version>${maven.release.plugin-version}</version>
+                <inherited>false</inherited>
+                <configuration>
+                    <autoVersionSubmodules>true</autoVersionSubmodules>
+                    <preparationGoals>clean</preparationGoals>
+                    <goals>deploy</goals>
+                    <useReleaseProfile>false</useReleaseProfile>
+                    <tagNameFormat>${project.artifactId}-@{project.version}</tagNameFormat>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
