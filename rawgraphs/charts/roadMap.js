@@ -104,7 +104,7 @@
   let chart = raw.chart()
   chart.model(model)
   chart.title('Road Map')
-    .description('Simple Road Map')
+    .description("Roadmap d'investissement budgétaire par année")
     .thumbnail("imgs/roadmap.png")
     .chartSource('aev')
 
