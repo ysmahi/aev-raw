@@ -204,7 +204,6 @@
       : graphWidth / (1 * coefWidthFirstColumns + columnsName.length)
     let firstColsCellsWidth = coefWidthFirstColumns * cellWidth
     // Because columnsName is only name of years
-    divGridGraph.attr('transform', 'translate(' + cellWidth + ', 0)')
 
     /* Calculation of totals per row and per first column */
     let totalsPerRow = getTotalsPerRow ()
@@ -914,7 +913,7 @@
             .attr('x', element => element.xBeginning + 0.6 * cellWidth)
             .attr('y', element => element.yBeginning + element.height - 20)
             .attr('dx', element => indexColumn * cellWidth)
-            .text((parseInt(yearsData[nameColumn]) + 1000)?parseFloat(yearsData[nameColumn]).toLocaleString("latn") + ' M€':yearsData[nameColumn])
+            .text((parseInt(yearsData[nameColumn]) + 1000)?parseFloat(yearsData[nameColumn]).toLocaleString() + ' M€':yearsData[nameColumn])
             .attr('class', 'additionalText')
         })
       })
