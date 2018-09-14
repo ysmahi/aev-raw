@@ -3,22 +3,22 @@
   let model = raw.model()
 
   let dimColumnsRaw = model.dimension()
-    .title('Name Columns')
+    .title('Colonnes')
     .types(String)
     .required(1)
 
   let dimRowsRaw = model.dimension()
-    .title('Name Rows')
+    .title('Lignes')
     .types(String)
     .required(1)
 
   let dimNameElements = model.dimension()
-    .title('Name of Elements')
+    .title('Elements')
     .types(String)
     .required(1)
 
   let dimColorElements = model.dimension()
-    .title('Color of Elements')
+    .title('Couleur des éléments')
     .types(String, Number)
 
   /* Map function */
@@ -114,7 +114,7 @@
     .defaultValue('Horizontalement et verticalement')
 
   let colors  = chart.color()
-    .title('Color scale')
+    .title('Echelle de couleurs')
 
   let chartOptions = {
     spot_radius : 30,

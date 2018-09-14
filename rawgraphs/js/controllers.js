@@ -404,7 +404,7 @@ angular.module('raw.controllers', [])
             if(a.title() > b.title()) return 1;
             return 0;
           })
-          $scope.chart = $scope.aevCharts.filter(d => {return d.title() == 'Road Map'})[0];
+          $scope.chart = $scope.aevCharts.filter(d => {return d.title() == 'Roadmap'})[0];
           $scope.model = $scope.chart ? $scope.chart.model() : null;
         });
       } catch(e){

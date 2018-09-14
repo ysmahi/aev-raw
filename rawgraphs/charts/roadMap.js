@@ -3,28 +3,28 @@
   let model = raw.model()
 
   let dimYearsRaw = model.dimension()
-    .title('Years data')
+    .title('Données pour chaque année')
     .types(String, Number)
     .multiple(true)
     .required(1)
 
   let dimFirstColumn = model.dimension()
-    .title('Name First Column')
+    .title('Colonnes')
     .types(String)
     .required(1)
 
   let dimRowRaw = model.dimension()
-    .title('Name Rows')
+    .title('Lignes')
     .types(String)
     .required(1)
 
   let dimNameElements = model.dimension()
-    .title('Name of Elements')
+    .title('Nom des Flèches')
     .types(String)
     .required(1)
 
   let dimColorElements = model.dimension()
-    .title('Color of Elements')
+    .title('Couleur des flèches')
     .types(String, Number)
 
   /* Map function */
@@ -103,29 +103,29 @@
   /* Definition of chart options */
   let chart = raw.chart()
   chart.model(model)
-  chart.title('Road Map')
+  chart.title('Roadmap')
     .description("Roadmap d'investissement budgétaire par année")
     .thumbnail("imgs/roadmap.png")
     .chartSource('aev')
 
   let displayFirstColumn = chart.checkbox()
-    .title("Display First Column")
+    .title("Afficher la première colonne")
     .defaultValue(true)
 
   let rawWidth = chart.number()
-    .title('Width')
+    .title('Largeur')
     .defaultValue(1000)
 
   let rawHeight = chart.number()
-    .title('Height')
+    .title('Hauteur')
     .defaultValue(900)
 
   let margin = chart.number()
-    .title('Margin')
+    .title('Marge')
     .defaultValue(10)
 
   let colors  = chart.color()
-    .title('Color scale')
+    .title('Echelle de couleurs')
 
   let wantedFirstColumn = chart.list()
 
