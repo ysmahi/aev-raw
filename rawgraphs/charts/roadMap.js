@@ -3,28 +3,28 @@
   let model = raw.model()
 
   let dimYearsRaw = model.dimension()
-    .title('Years data')
+    .title('Données pour chaque année')
     .types(String, Number)
     .multiple(true)
     .required(1)
 
   let dimFirstColumn = model.dimension()
-    .title('Name First Column')
+    .title('Première colonne')
     .types(String)
     .required(1)
 
   let dimRowRaw = model.dimension()
-    .title('Name Rows')
+    .title('Lignes')
     .types(String)
     .required(1)
 
   let dimNameElements = model.dimension()
-    .title('Name of Elements')
+    .title('Nom des Flèches')
     .types(String)
     .required(1)
 
   let dimColorElements = model.dimension()
-    .title('Color of Elements')
+    .title('Couleur des flèches')
     .types(String, Number)
 
   /* Map function */
@@ -103,29 +103,29 @@
   /* Definition of chart options */
   let chart = raw.chart()
   chart.model(model)
-  chart.title('Road Map')
+  chart.title('Roadmap')
     .description("Roadmap d'investissement budgétaire par année")
     .thumbnail("imgs/roadmap.png")
     .chartSource('aev')
 
   let displayFirstColumn = chart.checkbox()
-    .title("Display First Column")
+    .title("Afficher la première colonne")
     .defaultValue(true)
 
   let rawWidth = chart.number()
-    .title('Width')
+    .title('Largeur')
     .defaultValue(1000)
 
   let rawHeight = chart.number()
-    .title('Height')
+    .title('Hauteur')
     .defaultValue(900)
 
-  let margin = chart.number()
-    .title('Margin')
-    .defaultValue(10)
+  let fontSizeCoeff100 = chart.number()
+    .title('Taille de police')
+    .defaultValue(100)
 
   let colors  = chart.color()
-    .title('Color scale')
+    .title('Echelle de couleurs')
 
   let wantedFirstColumn = chart.list()
 
@@ -160,6 +160,7 @@
     let namesFirstColumnInstances = dataPerYear.map(el => el[dimFirstColumn]).filter((v, i, a) => a.indexOf(v) === i)
     let nameWantedFirstColumn = wantedFirstColumn()
     let isDisplayedFirstColumn = displayFirstColumn()
+    let fontSizeCoeff1 = fontSizeCoeff100() / 100
 
     console.log('dataChartPerYear', dataPerYear)
     let dimColumn = 'dimColumn'
@@ -892,7 +893,7 @@
           .attr('y', element => element.yBeginning)
           .style('fill', '#49648c')
           .style('font-family', 'Arial')
-          .style('font-size', '10px')
+          .style('font-size', 10 * fontSizeCoeff1 + 'px')
           .attr('class', 'nameElement')
           .call(wrap)
 

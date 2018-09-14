@@ -3,22 +3,22 @@
   let model = raw.model()
 
   let dimColumnsRaw = model.dimension()
-    .title('Name Columns')
+    .title('Colonnes')
     .types(String)
     .required(1)
 
   let dimRowsRaw = model.dimension()
-    .title('Name Rows')
+    .title('Lignes')
     .types(String)
     .required(1)
 
   let dimNameElements = model.dimension()
-    .title('Name of Elements')
+    .title('Elements')
     .types(String)
     .required(1)
 
   let dimColorElements = model.dimension()
-    .title('Color of Elements')
+    .title('Couleur des éléments')
     .types(String, Number)
 
   /* Map function */
@@ -114,7 +114,11 @@
     .defaultValue('Horizontalement et verticalement')
 
   let colors  = chart.color()
-    .title('Color scale')
+    .title('Echelle de couleurs')
+
+  let fontSizeCoeff100 = chart.number()
+    .title('Taille de police')
+    .defaultValue(100)
 
   let chartOptions = {
     spot_radius : 30,
@@ -141,6 +145,7 @@
     let checkboxesColumnsValues = checkboxesColumns.map(checkbox => checkbox())
     let columnsName = allColumns.filter((col, indexColumn) => checkboxesColumnsValues[indexColumn])
     let colorDimensionDefined = (nameDimColorElements)
+    let fontSizeCoeff1 = fontSizeCoeff100() / 100
 
     let data = dataRaw.filter(el => {
       let elHasAWantedColumn = columnsName.indexOf(el[dimColumn]) !== -1
@@ -862,7 +867,7 @@
           .attr('y', element => element.yCenter)
           .style('fill', '#ffffff')
           .style('font-family', 'Arial')
-          .style('font-size', '10px')
+          .style('font-size', 10 * fontSizeCoeff1 + 'px')
           .style('font-weight', 'bold')
       })
     }
