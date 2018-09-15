@@ -95,11 +95,45 @@ angular.module('raw.controllers', [])
       }
     };
 
+    $scope.reuploadFile = file => {
+      $scope.loading = true;
+      // excel
+      if (file.name.search(/\.xls|\.xlsx/) != -1 || file.type.search('sheet') != -1) {
+        dataService.loadExcel(file)
+        .then(worksheets => {
+          $scope.loading = false;
+          $scope.parseOnRefresh(worksheets[0].text);
+        })
+      }
+
+      // json
+      if (file.type.search('json') != -1) {
+        dataService.loadJson(file)
+        .then(json => {
+          $scope.fileName = file.name;
+          selectArray(json);
+        })
+      }
+
+      // txt
+      if (file.type.search('text') != -1) {
+        dataService.loadText(file)
+        .then(text => {
+          $scope.fileName = file.name;
+          $scope.parseOnRefresh(text);
+        })
+      }
+    }
+
     // Refresh the chart
     $scope.refreshChart = () => {
-      $scope.uploadFile($scope.files);
+      // $scope.uploadFile($scope.files);
+      $scope.onChartRefresh = true
+      $scope.reuploadFile($scope.files)
       // TODO : scope.data inchangé dans directives.js
-      $rootScope.$broadcast("update")
+      // let svgSelection = d3.select('#chart') 
+      // $scope.chart(svgSelection)
+     //$rootScope.$broadcast("update")
     }
 
     function parseData(json){
@@ -371,10 +405,26 @@ angular.module('raw.controllers', [])
 
     }
 
+    $scope.parseOnRefresh = text => {
+      $scope.text = text;
+      $scope.data = [];
+      //$scope.metadata = [];
+      $scope.error = false;
 
-
+      var parser = raw.parser();
+        $scope.data = parser(text);
+        //$scope.metadata = parser.metadata(text);
+        $scope.error = false;
+        pivotable($scope.data);
+        $scope.parsed = true;
+    }
 
     $scope.parse = text => {
+
+      if ($scope.onChartRefresh) {
+        $scope.onChartRefresh === false;
+        return;
+      }
 
       if ($scope.model) $scope.model.clear();
 
@@ -404,7 +454,7 @@ angular.module('raw.controllers', [])
             if(a.title() > b.title()) return 1;
             return 0;
           })
-          $scope.chart = $scope.aevCharts.filter(d => {return d.title() == 'Road Map'})[0];
+          $scope.chart = $scope.aevCharts.filter(d => {return d.title() == 'Roadmap'})[0];
           $scope.model = $scope.chart ? $scope.chart.model() : null;
         });
       } catch(e){

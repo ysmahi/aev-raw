@@ -3,22 +3,22 @@
   let model = raw.model()
 
   let dimColumnsRaw = model.dimension()
-    .title('Name Columns')
+    .title('Colonnes')
     .types(String)
     .required(1)
 
   let dimRowsRaw = model.dimension()
-    .title('Name Rows')
+    .title('Lignes')
     .types(String)
     .required(1)
 
   let dimNameElements = model.dimension()
-    .title('Name of Elements')
+    .title('Elements')
     .types(String)
     .required(1)
 
   let dimColorElements = model.dimension()
-    .title('Color of Elements')
+    .title('Couleur des éléments')
     .types(String, Number)
 
   /* Map function */
@@ -98,6 +98,7 @@
   chart.title('Couverture de domaines')
     .description('Couverture de capacités ou de domaines par des Services Applicatifs (SA)')
     .chartSource('aev')
+    .thumbnail("imgs/couverture.png")
 
   let rawWidth = chart.number()
     .title('Largeur')
@@ -109,11 +110,15 @@
 
   let elementsDisposalManner = chart.list()
     .title("Affichage des éléments")
-    .values(['Verticalement', 'Horizontalement','Horizontalement et verticalement', 'Eléments courts'])
+    .values(['Horizontalement et verticalement', 'Eléments courts'])
     .defaultValue('Horizontalement et verticalement')
 
   let colors  = chart.color()
-    .title('Color scale')
+    .title('Echelle de couleurs')
+
+  let fontSizeCoeff100 = chart.number()
+    .title('Taille de police')
+    .defaultValue(100)
 
   let chartOptions = {
     spot_radius : 30,
@@ -135,18 +140,19 @@
     let dimColorElements = 'dimColorElements'
     let nameDimRowRaw = nameDimensions.nameDimRowsRaw
     let nameDimColorElements = nameDimensions.nameDimColorElements
-    let colorsPallet = ['#c0cff7', '#4170e7', '#00b0f0']
-    let directionElements = (elementsDisposalManner() === 'Eléments courts')
+    let colorsPalletColumns = ['#c0cff7', '#4170e7', '#00b0f0']
+    let smallElementsDisposal = (elementsDisposalManner() === 'Eléments courts')
     let checkboxesColumnsValues = checkboxesColumns.map(checkbox => checkbox())
     let columnsName = allColumns.filter((col, indexColumn) => checkboxesColumnsValues[indexColumn])
     let colorDimensionDefined = (nameDimColorElements)
+    let fontSizeCoeff1 = fontSizeCoeff100() / 100
 
     let data = dataRaw.filter(el => {
       let elHasAWantedColumn = columnsName.indexOf(el[dimColumn]) !== -1
       if (elHasAWantedColumn) return el
     })
 
-    // Create color domain
+    // Create color domain for elements
     colors.domain(data, el => el[dimColorElements])
 
     let margin = {top: 5, right: 5, bottom: 5, left: 5},
@@ -167,7 +173,7 @@
     let colNamesPlusEmpty = ['', ...columnsName]
     let columnsColors = []
     for (let col = 0; col < columnsName.length; col++) {
-      columnsColors.push(colorsPallet[col % colorsPallet.length])
+      columnsColors.push(colorsPalletColumns[col % colorsPalletColumns.length])
     }
     let rowsName = data.map(el => el[dimRow]).filter((v, i, a) => a.indexOf(v) === i)
 
@@ -176,7 +182,7 @@
 
     // Separation of vertical, horizontal and single elements
     let verticalElementsData = [], horizontalElementsData = [], singleElementsData = []
-    if (!directionElements) {
+    if (!smallElementsDisposal) {
       // If we authorize big horizontal or vertical elements
       let separatedData = createMultiSingleData (data, dimRow, dimColumn, dimElementInside)
       verticalElementsData = separatedData[0]
@@ -225,10 +231,11 @@
     let maxVerticalElements = getMaxVerticalElements (verticalElementsData, rowsName, columnsName)
     let maxElementInCell = maxVerticalElements * maxHorizontalElements
 
-    console.log('maxHorizElements', maxHorizontalElements)
-    console.log('maxVertElements', maxVerticalElements)
+    let closestDivisorsOfMax = getClosestDivisors(maxHorizontalElements)
+    let maxXElements = closestDivisorsOfMax[0] // number of maximum elments on x axis, useful when small elements displayal
+    let maxYElements = closestDivisorsOfMax[1] // number of maximum elments on y axis, useful when small elements displayal
 
-    // Cell and element width
+    /* Definition of cell and element width, height, and margins */
     let marginBetweenColumns = 3
     let marginBetweenRowsOfFirstColumn = 5
     let coefWidthFirstColumn = 0.75
@@ -242,26 +249,14 @@
     let horizontalElementsHeight = cellHeight / (maxHorizontalElements + 1)
     let marginXVerticalElements = (cellWidth - maxVerticalElements * verticalElementsWidth) / (1 + maxVerticalElements)
     let marginYHorizontalElements = (cellHeight - maxHorizontalElements * horizontalElementsHeight) / (maxHorizontalElements + 1)
+    // Same definition for small elements
+    let marginXSmallElements = 3
+    let marginYSmallElements = 5
+    let widthSmallElements = (cellWidth - marginXSmallElements) / maxXElements - marginXSmallElements
+    let heightSmallElements = (cellHeight - marginYSmallElements) / maxYElements - marginYSmallElements
 
     // Create position data for grid
     let gridData = createGridData(rowsName.length + 1, columnsName.length + 1, cellWidth, cellHeight)
-    // Append
-    // names of row and columns in data
-    gridData[0].forEach((col, indexCol) => col.name = colNamesPlusEmpty[indexCol]) // name columns
-    for(let i=1; i<gridData.length; i++) { // name rows
-      let currentRow = gridData[i]
-      currentRow[0].name = rowsName[i - 1]
-    }
-
-    for(let i=1; i<rowsName.length + 1; i++) {
-      let currentRow = gridData[i]
-      for (let j=0; j<columnsName.length; j++) {
-        let currentCell = currentRow[j + 1]
-        currentCell.rowName = rowsName[i - 1]
-        currentCell.columnName = columnsName[j]
-      }
-    }
-
     console.log('gridData', gridData)
 
     /* Creation of the underneath grid */
@@ -271,11 +266,16 @@
     /* Create superimposed svg elements */
     // Drawing of vertical and horizontal elements
     let insideTableSel = d3.select('#insideTable')
-    draw(verticalElementsData, insideTableSel, verticalElementsWidth, 'vertical')
-    draw(horizontalElementsData, insideTableSel, horizontalElementsHeight, 'horizontal')
+    if (smallElementsDisposal) {
+      draw(horizontalElementsData, insideTableSel, horizontalElementsHeight, 'small')
+    } 
+    else {
+      draw(verticalElementsData, insideTableSel, verticalElementsWidth, 'vertical')
+      draw(horizontalElementsData, insideTableSel, horizontalElementsHeight, 'horizontal')
+    }
 
-    // function that creates a grid
-// http://www.cagrimmett.com/til/2016/08/17/d3-lets-make-a-grid.html
+    /* Function that creates a grid */
+    // http://www.cagrimmett.com/til/2016/08/17/d3-lets-make-a-grid.html
     function createGridData (numberRow, numberColumn, cellWidth, cellHeight) {
       let data = [];
       let xpos = 1; //starting xpos and ypos at 1 so the stroke will show when we make the grid below
@@ -304,7 +304,24 @@
         // increment the y position for the next row. Move it down by height (height variable)
         ypos += height;
       }
-      return data;
+
+      // Append names of row and columns in data
+    data[0].forEach((col, indexCol) => col.name = colNamesPlusEmpty[indexCol]) // name columns
+    for(let i=1; i<data.length; i++) { // name rows
+      let currentRow = data[i]
+      currentRow[0].name = rowsName[i - 1]
+    }
+
+    for(let i=1; i<rowsName.length + 1; i++) {
+      let currentRow = data[i]
+      for (let j=0; j<columnsName.length; j++) {
+        let currentCell = currentRow[j + 1]
+        currentCell.rowName = rowsName[i - 1]
+        currentCell.columnName = columnsName[j]
+      }
+    }
+
+    return data
     }
 
     function drawGrid (parentSelection, gridData) {
@@ -488,7 +505,6 @@
 
       // Create all colored rectangles for legend
       for (let indexColor=0; indexColor<uniqueColorsValues.length; indexColor++) {
-        console.log('colorDoman', colors.domain())
         colorLegendG.append('rect')
         .attr('x', 50 + indexColor * (widthLegendRect + spaceBetweenRect))
         .attr('y', 0)
@@ -518,7 +534,7 @@
       colorLegendG.attr('transform', 'translate(' + 0.75 * cellWidth + ',' + yTranslate + ')')
     }
 
-    /* Calculate cell height depending on the maximum number of horizontal elements in a cell */
+    /* Calculate maximum of horizontal elements in the same cell */
     function getMaxHorizontalElements (horizontalElementsData, rowsName, columnsName) {
       let matrixHorizEl = new Array(rowsName.length).fill().map(() => {
         return new Array(columnsName.length)
@@ -535,7 +551,7 @@
       return Math.max(...matrixHorizEl.map(el => Math.max(...el)))
     }
 
-    /* Calculate cell width depending on the maximum number of vertical elements in a cell */
+    /* Calculate maximum of vertical elements in the same cell */
     function getMaxVerticalElements (verticalElementsData, rowsaName, columnsName) {
       let matrixVertEl = new Array(rowsName.length).fill().map(() => {
         return new Array(columnsName.length)
@@ -765,16 +781,20 @@
         let yCellCenter = yBeginning + cellHeight / 2
 
         let widthElement = (elementIsVertical)?
-          elementDimension:
-          xEnd - xBeginning + cellWidth - 20
+          elementDimension :
+          smallElementsDisposal ?
+          widthSmallElements :
+          xEnd - xBeginning + cellWidth - 20 // That case means element is horizontal
 
         let heightElement = (elementIsVertical)?
-          yEnd - yBeginning + cellHeight - 20:
+          yEnd - yBeginning + cellHeight - 20 :
+          smallElementsDisposal ?
+          heightSmallElements :
           elementDimension
 
         dataElement = {
-          x: (elementIsVertical)?xBeginning + marginXVerticalElements:xBeginning + 10,
-          y: (elementIsVertical)?yBeginning + 5:yBeginning + marginYHorizontalElements,
+          x: (elementIsVertical)?xBeginning + marginXVerticalElements: smallElementsDisposal ? xBeginning + marginXSmallElements : xBeginning + 10,
+          y: (elementIsVertical)?yBeginning + 5 : smallElementsDisposal ? yBeginning + marginYSmallElements : yBeginning + marginYHorizontalElements,
           size: [widthElement, heightElement],
           nameInsideElement: (elementIsSingle)?element[dimElementInside]:element.nameInsideElement,
           colorElement: nameDimColorElements ? colors()(element[dimColorElements]) : '#426bb0'
@@ -794,9 +814,9 @@
       })
 
       // Changes rectangles position so there is no overlapping and each element is on one row or one column
-      let formOfElement = 'rectangles'
-      if (typeElement === 'vertical') moveToRightPlaceVerticalElements(dataElements, formOfElement)
-      else moveToRightPlaceHorizontalElements(dataElements, formOfElement)
+      if (typeElement === 'vertical') moveToRightPlaceVerticalElements(dataElements)
+      else if (typeElement === 'horizontal') moveToRightPlaceHorizontalElements(dataElements)
+      else moveToRightPlaceSmallElements(dataElements)
 
       return dataElements
     }
@@ -847,7 +867,7 @@
           .attr('y', element => element.yCenter)
           .style('fill', '#ffffff')
           .style('font-family', 'Arial')
-          .style('font-size', '10px')
+          .style('font-size', 10 * fontSizeCoeff1 + 'px')
           .style('font-weight', 'bold')
       })
     }
@@ -883,7 +903,7 @@
     /* Creates force simulation to avoid overlapping of elements
      * and a force simulation to ensure each element is not out of a row or a column */
     function moveToRightPlaceVerticalElements (elementsData) {
-
+      console.log('elents data in move to right place vert', elementsData)
       let elementsToPlaceInColumns
       // For each column, look for elements
       columnsName.forEach(column => {
@@ -920,6 +940,7 @@
     /* Changes y position of all elements in elementsData to avoid overlapping */
     function moveToRightPlaceHorizontalElements (elementsData) {
       let elementsToPlaceInRow
+      console.log('elents data in move to right place horiz', elementsData)
       // For each row, look for elements
       rowsName.forEach(row => {
         elementsToPlaceInRow = elementsData.filter(el => el.rowName === row)
@@ -952,6 +973,60 @@
       })
     }
 
+    /* Changes x and y position of all small elements in elementsData to avoir overlapping */
+    function moveToRightPlaceSmallElements (elementsData) {
+      let alreadyUsedCoordinates = {} // Dictionary of already used coordinates. Keys are the x-axis values and Values are arrays of the y-axis values
+      let currentElementX
+      let currentElementY
+      let isNewX
+      let isAlreadyUsedCoordinates
+      let isMaxXElements
+      let countXElements
+      let stringCurrentElementX
+      let initialX
+
+      elementsData.forEach ((element) => {
+        initialX = element.x
+        currentElementX = element.x
+        currentElementY = element.y
+        countXElements = 1
+        stringCurrentElementX = currentElementX.toString()
+        isNewX = (Object.keys(alreadyUsedCoordinates).indexOf(stringCurrentElementX) === -1)
+
+        if (isNewX) alreadyUsedCoordinates[currentElementX] = [] // Add the new x value to alreadyUsed Object and initiate the y values array for this x
+
+        isAlreadyUsedCoordinates = (alreadyUsedCoordinates[currentElementX].indexOf(currentElementY) !== -1)
+
+        while (isAlreadyUsedCoordinates) {
+          isMaxXElements = (countXElements === maxXElements)
+
+          if (!isMaxXElements) {
+            // move element to the right
+            currentElementX += widthSmallElements + marginXSmallElements
+            countXElements++
+            stringCurrentElementX = currentElementX.toString()
+            isNewX = (Object.keys(alreadyUsedCoordinates).indexOf(stringCurrentElementX) === -1)
+            if (isNewX) alreadyUsedCoordinates[currentElementX] = []
+          }
+
+          else {
+            // Move element down
+            currentElementX = initialX
+            currentElementY += heightSmallElements + marginYSmallElements
+            countXElements = 1
+          }
+
+          isAlreadyUsedCoordinates = (alreadyUsedCoordinates[currentElementX].indexOf(currentElementY) !== -1)
+        }
+
+        // Coordinates are not used anymore so we assign them to the element
+        element.x = currentElementX
+        element.y = currentElementY
+        alreadyUsedCoordinates[currentElementX] = [...alreadyUsedCoordinates[currentElementX], currentElementY]
+      })
+    }
+
+    /* Function that returns the selection cell bounded data (contains x, y, width, height) */
     function getSelectionCellData (idCell) {
       return d3.selectAll('.Row').selectAll('.Cell').select(idCell).datum()
     }
@@ -988,5 +1063,15 @@
       }
     });
   }
+
+  /* Function that returns the two biggest divisors which, when multiplied together, are equal to given int */
+  function getClosestDivisors (myInt) {
+    let intTest = Math.ceil(Math.sqrt(myInt))
+    while (myInt % intTest !== 0) {
+      intTest++
+    }
+    return [intTest, myInt / intTest] // [biggerDivisor, smallestDivisor]
+  }
+
   })
 })();

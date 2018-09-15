@@ -636,11 +636,11 @@ angular.module('raw.directives', [])
       replace:true,
       template :  '<div class="row">' +
                     '<form class="form-search col-lg-12">' +
-                      '<button bs-select class="btn btn-default" placeholder="Choose type" ng-model="mode" bs-options="m.label for m in modes">' +
+                      '<button bs-select class="btn btn-default" placeholder="Choisir le format" ng-model="mode" bs-options="m.label for m in modes">' +
                       'Select <span class="caret"></span>' +
                       '</button>' +
-                      '<input class="form-control col-lg-12" placeholder="Filename" type="text" ng-model="filename">' +
-                      '<button class="btn btn-success form-control" ng-class="{disabled:!mode.label}" ng-click="mode.download()">Download</button>' +
+                      '<input class="form-control col-lg-12" placeholder="nom_fichier" type="text" ng-model="filename">' +
+                      '<button class="btn btn-success form-control" ng-class="{disabled:!mode.label}" ng-click="mode.download()">Télécharger</button>' +
                     '</form>' +
                   '</div>',
 
