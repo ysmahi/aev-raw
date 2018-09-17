@@ -3,7 +3,9 @@
 println("load file common")
 def mavenTask(String command) {
     println("mavenTask execution command")
-    def MAVEN_BUILD=tool 'Maven_3.5.2'
+    //def MAVEN_BUILD=tool 'Maven_3.5.2'       //SlaveOCP1
+    def MAVEN_BUILD=tool 'Maven_3.0.5_oc'  //SlaveABS
+
 
     if (isUnix()) {
         println("execute command line with sh")
