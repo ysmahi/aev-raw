@@ -246,7 +246,7 @@ angular.module('raw.directives', [])
 	        		update : ordinalUpdate
 	        	},*/
 	        	{
-	        		type : 'Linear (numeric)',
+	        		type : 'Linéaire (numérique)',
 	        		value : d3.scaleLinear().range(["#f7fbff", "#08306b"]),
 	        		reset : function(){ this.value.range(["#f7fbff", "#08306b"]); },
 	        		update : linearUpdate

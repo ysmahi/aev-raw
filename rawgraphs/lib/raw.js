@@ -330,7 +330,7 @@
     model.instruction = function() {
       return dimensions.values()
         .filter(function(d) { return d.required() > d.value.length; })
-        .map(function(d) { var v = d.required() - d.value.length > 1 ? 'dimensions' : 'dimension'; return '<b>'+d.title() + "</b> requires at least " + (d.required() - d.value.length) + " more " + v;  })
+        .map(function(d) { var v = d.required() - d.value.length > 1 ? 'dimensions' : 'dimension'; return '<b>'+d.title() + "</b> requiert au moins " + (d.required() - d.value.length) + " " + v + " de plus";  })
         .join(". ")
     }
 

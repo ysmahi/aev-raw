@@ -130,6 +130,7 @@ angular.module('raw.controllers', [])
       // $scope.uploadFile($scope.files);
       $scope.onChartRefresh = true
       $scope.reuploadFile($scope.files)
+      $scope.loading = false
       // TODO : scope.data inchangé dans directives.js
       // let svgSelection = d3.select('#chart') 
       // $scope.chart(svgSelection)
