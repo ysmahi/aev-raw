@@ -116,9 +116,9 @@
   let colors  = chart.color()
     .title('Echelle de couleurs')
 
-  let fontSizeCoeff100 = chart.number()
+  let fontSizeCoeff10 = chart.number()
     .title('Taille de police')
-    .defaultValue(100)
+    .defaultValue(10)
 
   let chartOptions = {
     spot_radius : 30,
@@ -145,7 +145,7 @@
     let checkboxesColumnsValues = checkboxesColumns.map(checkbox => checkbox())
     let columnsName = allColumns.filter((col, indexColumn) => checkboxesColumnsValues[indexColumn])
     let colorDimensionDefined = (nameDimColorElements)
-    let fontSizeCoeff1 = fontSizeCoeff100() / 100
+    let fontSizeCoeff1 = fontSizeCoeff10() / 10
 
     let data = dataRaw.filter(el => {
       let elHasAWantedColumn = columnsName.indexOf(el[dimColumn]) !== -1

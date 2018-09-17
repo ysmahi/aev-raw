@@ -120,9 +120,9 @@
     .title('Hauteur')
     .defaultValue(900)
 
-  let fontSizeCoeff100 = chart.number()
+  let fontSizeCoeff10 = chart.number()
     .title('Taille de police')
-    .defaultValue(100)
+    .defaultValue(10)
 
   let colors  = chart.color()
     .title('Echelle de couleurs')
@@ -160,7 +160,7 @@
     let namesFirstColumnInstances = dataPerYear.map(el => el[dimFirstColumn]).filter((v, i, a) => a.indexOf(v) === i)
     let nameWantedFirstColumn = wantedFirstColumn()
     let isDisplayedFirstColumn = displayFirstColumn()
-    let fontSizeCoeff1 = fontSizeCoeff100() / 100
+    let fontSizeCoeff1 = fontSizeCoeff10() / 10
 
     console.log('dataChartPerYear', dataPerYear)
     let dimColumn = 'dimColumn'
@@ -430,7 +430,7 @@
           return nameColor
         })
         .style('font-family', 'Arial')
-        .style('font-size', '11px')
+        .style('font-size', cell => cell.hasOwnProperty('titleRow') ? 11 * fontSizeCoeff1 + 'px' : '11px')
         .call(wrap)
 
       // Draw lines that separate columns
@@ -468,7 +468,7 @@
           .attr('text-anchor', 'middle')
           .style('font-weight', 'bold')
           .style('font-family', 'Arial')
-          .style('font-size', '11px')
+          .style('font-size', 11 * fontSizeCoeff1 + 'px')
             .style('fill', '#ffffff')
         })
     }
@@ -523,7 +523,7 @@
         .style('fill', '#ffffff')
         .style('font-weight', 'bold')
         .style('font-family', 'Arial')
-        .style('font-size', '11px')
+        .style('font-size', 11 * fontSizeCoeff1 + 'px')
         .call(wrap)
 
       // Append totals
@@ -537,7 +537,7 @@
           .style('fill', '#ffffff')
           .style('font-weight', 'bold')
           .style('font-family', 'Arial')
-          .style('font-size', '11px')
+          .style('font-size', 11 * fontSizeCoeff1 + 'px')
       }
 
       // Append big total
@@ -550,7 +550,7 @@
         .style('fill', '#ffffff')
         .style('font-weight', 'bold')
         .style('font-family', 'Arial')
-        .style('font-size', '11px')
+        .style('font-size', 11 * fontSizeCoeff1 + 'px')
     }
 
     /* Calculate the maximum of elements that are in the same row
@@ -906,7 +906,7 @@
           .attr('y', element => element.yBeginning + element.height - 20)
           .style('fill', '#49648c')
           .style('font-family', 'Arial')
-          .style('font-size', '10px')
+          .style('font-size', 10 * fontSizeCoeff1 + 'px')
 
         Object.keys(yearsData).forEach((nameColumn, indexColumn) => {
           // nameColumn is usually year but could be '>2022' or 'Next 5 years' for example
