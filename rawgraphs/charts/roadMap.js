@@ -277,7 +277,7 @@
     /* Create superimposed svg elements */
     // Drawing of vertical elements and creating
     let gridSelection = d3.select('#grid')
-    draw(horizontalElementsData, gridSelection, elementHeight)
+    drawElements(horizontalElementsData, gridSelection, elementHeight)
 
     // function that creates a grid
     // http://www.cagrimmett.com/til/2016/08/17/d3-lets-make-a-grid.html
@@ -345,6 +345,8 @@
         .enter()
         .append('g')
         .attr('class', 'Cell')
+
+        let mySelection = d3.select('.randomID')
 
       // Create rectangles for cells
       let rowIndex = 0
@@ -836,7 +838,7 @@
     /* Function to draw all elements on the graph
     * typeOfElement can be 'multi' for big rectangle elements or 'single' for unique cell elements
      * that will be drawn as circles */
-    function draw(elementsData, gridSelection, elementHeight) {
+    function drawElements(elementsData, gridSelection, elementHeight) {
       let dataElements = createElementsPositionData(elementsData, elementHeight)
 
       let elementsSpace = gridSelection.append('svg')

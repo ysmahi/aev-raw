@@ -1,6 +1,5 @@
 {
   "name": "aevisualizer",
-  "main": "server.js",
   "dependencies": {
     "@bower_components/angular": "angular/bower-angular#1.6.2",
     "@bower_components/angular-animate": "angular/bower-angular-animate#1.6.2",

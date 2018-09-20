@@ -267,11 +267,11 @@
     // Drawing of vertical and horizontal elements
     let insideTableSel = d3.select('#insideTable')
     if (smallElementsDisposal) {
-      draw(horizontalElementsData, insideTableSel, horizontalElementsHeight, 'small')
+      drawElements(horizontalElementsData, insideTableSel, horizontalElementsHeight, 'small')
     } 
     else {
-      draw(verticalElementsData, insideTableSel, verticalElementsWidth, 'vertical')
-      draw(horizontalElementsData, insideTableSel, horizontalElementsHeight, 'horizontal')
+      drawElements(verticalElementsData, insideTableSel, verticalElementsWidth, 'vertical')
+      drawElements(horizontalElementsData, insideTableSel, horizontalElementsHeight, 'horizontal')
     }
 
     /* Function that creates a grid */
@@ -823,7 +823,7 @@
 
     /* Function to draw all elements on the graph
     * typeOfElement can be 'vertical' or 'horizontal */
-    function draw(elementsData, insideTableSelection, elementDimension, typeElement) {
+    function drawElements(elementsData, insideTableSelection, elementDimension, typeElement) {
       let dataElements = createElementsPositionData(elementsData, elementDimension, typeElement)
 
       let elementsSpace = insideTableSelection.append('svg')
