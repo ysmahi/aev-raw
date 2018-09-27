@@ -941,11 +941,11 @@
 
       d3.select(this.parentNode).select('path')
         .attr('d',element => {
-          let topArrowX = d3.event.x + element.width
+          let topArrowX = d3.event.x + element.width - 0.7
           let topArrowY = d3.event.y
-          let middleArrowX = d3.event.x + element.width + 30
+          let middleArrowX = d3.event.x + element.width + 15
           let middleArrowY = d3.event.y + element.height / 2
-          let bottomArrowX = d3.event.x + element.width
+          let bottomArrowX = topArrowX
           let bottomArrowY = d3.event.y + element.height
           return 'M' + topArrowX + ' ' + topArrowY //Upper point of arrow
             + ' L' + middleArrowX + ' ' + middleArrowY // Front point of arrow
